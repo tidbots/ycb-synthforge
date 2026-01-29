@@ -100,10 +100,10 @@ materials:
 
 # Object placement
 placement:
-  # Position randomization - tighter grouping for better visibility
+  # Position randomization - grid-based spacing
   position:
-    x_range: [-0.15, 0.15]
-    y_range: [-0.15, 0.15]
+    x_range: [-0.25, 0.25]
+    y_range: [-0.25, 0.25]
     z_range: [0, 0.2]
   # Rotation randomization
   rotation:
@@ -112,7 +112,7 @@ placement:
     z: [0, 360]
   # Scale variation (manufacturing tolerance)
   scale_variation: [-0.05, 0.05]  # ±5%
-  # Physics simulation - disabled to keep objects on table
+  # Physics simulation - disabled, using grid-based placement instead
   use_physics: false
   physics_steps: 100
 

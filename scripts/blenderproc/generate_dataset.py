@@ -50,6 +50,12 @@ def setup_random_seeds(seed: int) -> None:
     logger.info(f"Random seed set to {seed}")
 
 
+# Objects to exclude due to mesh/texture issues
+EXCLUDED_OBJECTS = {
+    "022_windex_bottle",  # Mesh appears deformed/crumpled
+}
+
+
 def get_ycb_model_paths(ycb_dir: str) -> Dict[str, str]:
     """
     Get paths to all YCB model OBJ files.
@@ -64,6 +70,11 @@ def get_ycb_model_paths(ycb_dir: str) -> Dict[str, str]:
     ycb_path = Path(ycb_dir)
 
     for obj_name in YCB_CLASSES.values():
+        # Skip excluded objects
+        if obj_name in EXCLUDED_OBJECTS:
+            logger.info(f"Excluding {obj_name}: known mesh/texture issues")
+            continue
+
         # ONLY use google_16k format (poisson format has corrupted normals)
         google_path = ycb_path / obj_name / "google_16k" / "textured.obj"
         if google_path.exists():
@@ -79,6 +90,7 @@ def load_ycb_objects(
     model_paths: Dict[str, str],
     selected_objects: List[str],
     material_randomizer: MaterialRandomizer,
+    use_physics: bool = False,
 ) -> List[bproc.types.MeshObject]:
     """
     Load and prepare YCB objects for the scene.
@@ -87,6 +99,7 @@ def load_ycb_objects(
         model_paths: Dictionary of object names to file paths
         selected_objects: List of object names to load
         material_randomizer: Material randomizer instance
+        use_physics: Whether to enable physics simulation
 
     Returns:
         List of loaded mesh objects
@@ -116,12 +129,13 @@ def load_ycb_objects(
                 # material_type = get_material_type(obj_name)
                 # material_randomizer.randomize_object_material(obj, material_type)
 
-                # Enable physics
-                obj.enable_rigidbody(
-                    active=True,
-                    collision_shape="CONVEX_HULL",
-                    mass=0.1,
-                )
+                # Enable physics only if physics simulation will be used
+                if use_physics:
+                    obj.enable_rigidbody(
+                        active=True,
+                        collision_shape="CONVEX_HULL",
+                        mass=0.1,
+                    )
 
                 loaded_objects.append(obj)
 
@@ -164,6 +178,10 @@ def generate_scene(
         room_result = scene_setup.create_room()
         surface_height = room_result.get("surface_height", 0)
 
+        # Get placement config early to check physics setting
+        placement_config = config.get("placement", {})
+        use_physics = placement_config.get("use_physics", False)
+
         # Randomly select YCB objects for this scene
         num_objects = random.randint(
             config["scene"]["objects_per_scene"][0],
@@ -180,27 +198,47 @@ def generate_scene(
             model_paths,
             selected_objects,
             material_randomizer,
+            use_physics=use_physics,
         )
 
         if not ycb_objects:
             logger.warning(f"Scene {scene_idx}: No objects loaded, skipping")
             return None
 
-        # Position objects randomly
-        placement_config = config.get("placement", {})
-        for obj in ycb_objects:
-            # Random position on table surface
-            pos_cfg = placement_config.get("position", {})
-            x = random.uniform(pos_cfg.get("x_range", [-0.15, 0.15])[0], pos_cfg.get("x_range", [-0.15, 0.15])[1])
-            y = random.uniform(pos_cfg.get("y_range", [-0.15, 0.15])[0], pos_cfg.get("y_range", [-0.15, 0.15])[1])
-            # Place objects on the table surface (add small offset for object center)
+        # Position objects with grid-based spacing to avoid overlap
+        pos_cfg = placement_config.get("position", {})
+        x_range = pos_cfg.get("x_range", [-0.2, 0.2])
+        y_range = pos_cfg.get("y_range", [-0.2, 0.2])
+
+        # Calculate grid spacing based on number of objects
+        num_objs = len(ycb_objects)
+        grid_size = int(np.ceil(np.sqrt(num_objs)))
+        x_step = (x_range[1] - x_range[0]) / max(grid_size, 1)
+        y_step = (y_range[1] - y_range[0]) / max(grid_size, 1)
+
+        # Place objects in a grid with random offset
+        for i, obj in enumerate(ycb_objects):
+            grid_x = i % grid_size
+            grid_y = i // grid_size
+
+            # Base position from grid
+            base_x = x_range[0] + (grid_x + 0.5) * x_step
+            base_y = y_range[0] + (grid_y + 0.5) * y_step
+
+            # Add small random offset (within cell)
+            offset_x = random.uniform(-x_step * 0.3, x_step * 0.3)
+            offset_y = random.uniform(-y_step * 0.3, y_step * 0.3)
+
+            x = base_x + offset_x
+            y = base_y + offset_y
             z = surface_height + 0.05
+
             obj.set_location([x, y, z])
 
-            # Rotation - mostly upright with random z rotation
-            rx = np.radians(random.uniform(-15, 15))  # Small tilt
-            ry = np.radians(random.uniform(-15, 15))  # Small tilt
-            rz = np.radians(random.uniform(0, 360))   # Full rotation around vertical
+            # Rotation - upright with random z rotation
+            rx = np.radians(random.uniform(-10, 10))
+            ry = np.radians(random.uniform(-10, 10))
+            rz = np.radians(random.uniform(0, 360))
             obj.set_rotation_euler([rx, ry, rz])
 
             # Scale up objects to be more visible
@@ -210,11 +248,12 @@ def generate_scene(
             obj.set_scale([scale, scale, scale])
 
         # Run physics simulation to settle objects
-        if placement_config.get("use_physics", True):
+        if use_physics:
             bproc.object.simulate_physics_and_fix_final_poses(
-                min_simulation_time=1,
-                max_simulation_time=4,
+                min_simulation_time=2,
+                max_simulation_time=6,
                 check_object_interval=1,
+                substeps_per_frame=20,
             )
 
         # Setup lighting
