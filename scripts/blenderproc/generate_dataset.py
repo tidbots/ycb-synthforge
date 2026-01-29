@@ -64,22 +64,12 @@ def get_ycb_model_paths(ycb_dir: str) -> Dict[str, str]:
     ycb_path = Path(ycb_dir)
 
     for obj_name in YCB_CLASSES.values():
-        # YCB structure: ycb/{name}/{name}/poisson/textured.obj
-        obj_path = ycb_path / obj_name / obj_name / "poisson" / "textured.obj"
-        if obj_path.exists():
-            model_paths[obj_name] = str(obj_path)
+        # ONLY use google_16k format (poisson format has corrupted normals)
+        google_path = ycb_path / obj_name / "google_16k" / "textured.obj"
+        if google_path.exists():
+            model_paths[obj_name] = str(google_path)
         else:
-            # Try actual YCB dataset structure: ycb/{name}/poisson/textured.obj
-            alt_path = ycb_path / obj_name / "poisson" / "textured.obj"
-            if alt_path.exists():
-                model_paths[obj_name] = str(alt_path)
-            else:
-                # Try flat structure: ycb/{name}/textured.obj
-                flat_path = ycb_path / obj_name / "textured.obj"
-                if flat_path.exists():
-                    model_paths[obj_name] = str(flat_path)
-                else:
-                    logger.warning(f"Model not found for {obj_name}")
+            logger.warning(f"Skipping {obj_name}: google_16k format not available")
 
     logger.info(f"Found {len(model_paths)} YCB models")
     return model_paths
@@ -121,9 +111,10 @@ def load_ycb_objects(
                 obj.set_cp("category_id", class_id)
                 obj.set_cp("class_name", obj_name)
 
-                # Apply material randomization based on object type
-                material_type = get_material_type(obj_name)
-                material_randomizer.randomize_object_material(obj, material_type)
+                # Skip material randomization to preserve original textures
+                # TODO: Fix material randomization to not break textures
+                # material_type = get_material_type(obj_name)
+                # material_randomizer.randomize_object_material(obj, material_type)
 
                 # Enable physics
                 obj.enable_rigidbody(
@@ -169,8 +160,9 @@ def generate_scene(
         # Clear previous scene (keep Blender initialized)
         bproc.clean_up(clean_up_camera=True)
 
-        # Setup background (floor, walls)
-        scene_setup.create_room()
+        # Setup background (floor, walls, table)
+        room_result = scene_setup.create_room()
+        surface_height = room_result.get("surface_height", 0)
 
         # Randomly select YCB objects for this scene
         num_objects = random.randint(
@@ -197,23 +189,24 @@ def generate_scene(
         # Position objects randomly
         placement_config = config.get("placement", {})
         for obj in ycb_objects:
-            # Random position
+            # Random position on table surface
             pos_cfg = placement_config.get("position", {})
-            x = random.uniform(pos_cfg.get("x_range", [-0.3, 0.3])[0], pos_cfg.get("x_range", [-0.3, 0.3])[1])
-            y = random.uniform(pos_cfg.get("y_range", [-0.3, 0.3])[0], pos_cfg.get("y_range", [-0.3, 0.3])[1])
-            z = random.uniform(0.1, 0.5)  # Start above the floor
+            x = random.uniform(pos_cfg.get("x_range", [-0.15, 0.15])[0], pos_cfg.get("x_range", [-0.15, 0.15])[1])
+            y = random.uniform(pos_cfg.get("y_range", [-0.15, 0.15])[0], pos_cfg.get("y_range", [-0.15, 0.15])[1])
+            # Place objects on the table surface (add small offset for object center)
+            z = surface_height + 0.05
             obj.set_location([x, y, z])
 
-            # Random rotation
-            rot_cfg = placement_config.get("rotation", {})
-            rx = np.radians(random.uniform(rot_cfg.get("x", [0, 360])[0], rot_cfg.get("x", [0, 360])[1]))
-            ry = np.radians(random.uniform(rot_cfg.get("y", [0, 360])[0], rot_cfg.get("y", [0, 360])[1]))
-            rz = np.radians(random.uniform(rot_cfg.get("z", [0, 360])[0], rot_cfg.get("z", [0, 360])[1]))
+            # Rotation - mostly upright with random z rotation
+            rx = np.radians(random.uniform(-15, 15))  # Small tilt
+            ry = np.radians(random.uniform(-15, 15))  # Small tilt
+            rz = np.radians(random.uniform(0, 360))   # Full rotation around vertical
             obj.set_rotation_euler([rx, ry, rz])
 
-            # Scale variation (manufacturing tolerance)
+            # Scale up objects to be more visible
             scale_var = placement_config.get("scale_variation", [-0.05, 0.05])
-            scale = 1.0 + random.uniform(scale_var[0], scale_var[1])
+            base_scale = 1.5  # Scale up by 50%
+            scale = base_scale * (1.0 + random.uniform(scale_var[0], scale_var[1]))
             obj.set_scale([scale, scale, scale])
 
         # Run physics simulation to settle objects

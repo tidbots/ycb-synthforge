@@ -4,11 +4,12 @@ BlenderProcによる合成データ生成とYOLO26によるYCB物体検出パイ
 
 ## 概要
 
-YCB SynthForgeは、103種類のYCBオブジェクトを検出するためのEnd-to-Endパイプラインです。
+YCB SynthForgeは、78種類のYCBオブジェクトを検出するためのEnd-to-Endパイプラインです。
 
 - **合成データ生成**: BlenderProcによるフォトリアリスティックなレンダリング
 - **ドメインランダム化**: Sim-to-Real転移のための多様なデータ生成
 - **YOLO26学習**: COCO事前学習モデルのファインチューニング
+- **google_16k形式**: 高品質なテクスチャ付きメッシュを使用
 
 ## プロジェクト構成
 
@@ -19,7 +20,7 @@ ycb_synthforge/
 │   └── Dockerfile.yolo26         # YOLO26学習環境
 ├── docker-compose.yml
 ├── models/
-│   └── ycb/                      # YCB 3Dモデル (103クラス)
+│   └── ycb/                      # YCB 3Dモデル (78クラス, google_16k形式)
 ├── resources/
 │   └── cctextures/               # CC0テクスチャ (2022枚)
 ├── weights/
@@ -109,6 +110,8 @@ python scripts/download_weights.py --models yolo26m --force
 
 ### YCB 3Dモデルのダウンロード
 
+**重要**: `google_16k`形式を使用してください。`berkeley`形式（poisson）はBlenderでテクスチャが壊れる問題があります。
+
 ```bash
 # オブジェクト一覧を表示
 python scripts/download_ycb_models.py --list
@@ -116,28 +119,27 @@ python scripts/download_ycb_models.py --list
 # カテゴリ一覧を表示
 python scripts/download_ycb_models.py --list-categories
 
-# 全103オブジェクトをダウンロード (~3GB)
-python scripts/download_ycb_models.py --all
+# 全オブジェクトをgoogle_16k形式でダウンロード（推奨）
+python scripts/download_ycb_models.py --all --format google_16k
 
 # カテゴリ指定でダウンロード
-python scripts/download_ycb_models.py --category food fruit kitchen
+python scripts/download_ycb_models.py --category food fruit kitchen --format google_16k
 
 # 特定オブジェクトのみダウンロード
-python scripts/download_ycb_models.py --objects 001_chips_can 002_master_chef_can
+python scripts/download_ycb_models.py --objects 003_cracker_box 005_tomato_soup_can --format google_16k
 
 # 強制的に再ダウンロード
-python scripts/download_ycb_models.py --all --force
+python scripts/download_ycb_models.py --all --format google_16k --force
 ```
 
-| カテゴリ | オブジェクト数 | 内容 |
-|---------|--------------|------|
-| food | 10 | 缶詰、箱入り食品 |
-| fruit | 8 | バナナ、りんご、レモン等 |
-| kitchen | 14 | ボウル、マグ、フォーク等 |
-| tool | 17 | ドリル、ハンマー、ドライバー等 |
-| sport | 6 | ボール類 |
-| toy | 34 | レゴ、飛行機、サイコロ等 |
-| misc | 14 | カップ、タイマー等 |
+| 形式 | 説明 | 推奨 |
+|------|------|------|
+| google_16k | 16kポリゴン、高品質テクスチャ | ✅ 推奨 |
+| google_64k | 64kポリゴン、より高解像度 | |
+| google_512k | 512kポリゴン、最高解像度 | |
+| berkeley | poisson/tsdf形式（非推奨） | ❌ テクスチャ破損あり |
+
+**注意**: google_16k形式は103オブジェクト中78オブジェクトのみ利用可能です。
 
 ### CC0テクスチャのダウンロード
 
@@ -271,38 +273,35 @@ Sim-to-Realギャップを軽減するため、以下の要素をランダム化
 | Val | 1,000 | 8.3% | ハイパーパラメータ調整 |
 | Test | 1,000 | 8.3% | 最終評価 |
 
-## YCBオブジェクトクラス (103種)
+## YCBオブジェクトクラス (78種 - google_16k形式)
 
 <details>
-<summary>クラス一覧を表示</summary>
+<summary>利用可能なクラス一覧を表示</summary>
 
-### 食品・飲料 (ID: 0-9)
-| ID | 名前 | ID | 名前 |
-|----|------|----|------|
-| 0 | 001_chips_can | 5 | 006_mustard_bottle |
-| 1 | 002_master_chef_can | 6 | 007_tuna_fish_can |
-| 2 | 003_cracker_box | 7 | 008_pudding_box |
-| 3 | 004_sugar_box | 8 | 009_gelatin_box |
-| 4 | 005_tomato_soup_can | 9 | 010_potted_meat_can |
+### 食品・飲料 (9個)
+002_master_chef_can, 003_cracker_box, 004_sugar_box, 005_tomato_soup_can, 006_mustard_bottle, 007_tuna_fish_can, 008_pudding_box, 009_gelatin_box, 010_potted_meat_can
 
-### 果物 (ID: 10-17)
-| ID | 名前 | ID | 名前 |
-|----|------|----|------|
-| 10 | 011_banana | 14 | 015_peach |
-| 11 | 012_strawberry | 15 | 016_pear |
-| 12 | 013_apple | 16 | 017_orange |
-| 13 | 014_lemon | 17 | 018_plum |
+### 果物 (8個)
+011_banana, 012_strawberry, 013_apple, 014_lemon, 015_peach, 016_pear, 017_orange, 018_plum
 
-### キッチン用品 (ID: 18-31)
-019_pitcher_base, 021_bleach_cleanser, 022_windex_bottle, 023_wine_glass, 024_bowl, 025_mug, 026_sponge, 027-skillet, 028_skillet_lid, 029_plate, 030_fork, 031_spoon, 032_knife, 033_spatula
+### キッチン用品 (11個)
+019_pitcher_base, 021_bleach_cleanser, 022_windex_bottle, 024_bowl, 025_mug, 026_sponge, 028_skillet_lid, 029_plate, 030_fork, 031_spoon, 032_knife
 
-### 工具 (ID: 32-48)
-035_power_drill, 036_wood_block, 037_scissors, 038_padlock, 039_key, 040_large_marker, 041_small_marker, 042_adjustable_wrench, 043_phillips_screwdriver, 044_flat_screwdriver, 046_plastic_bolt, 047_plastic_nut, 048_hammer, 049-052_clamps
+### 工具 (12個)
+035_power_drill, 036_wood_block, 037_scissors, 038_padlock, 040_large_marker, 042_adjustable_wrench, 043_phillips_screwdriver, 044_flat_screwdriver, 048_hammer, 050_medium_clamp, 051_large_clamp, 052_extra_large_clamp
 
-### スポーツ・おもちゃ (ID: 49-102)
-ボール類、チェーン、フォームブロック、サイコロ、ビー玉、カップ、木製ブロック、おもちゃの飛行機、レゴデュプロ、タイマー、ルービックキューブ
+### スポーツ (6個)
+053_mini_soccer_ball, 054_softball, 055_baseball, 056_tennis_ball, 057_racquetball, 058_golf_ball
+
+### その他 (32個)
+059_chain, 061_foam_brick, 062_dice, 063-a_marbles, 063-b_marbles, 065-a〜j_cups, 070-a/b_colored_wood_blocks, 071_nine_hole_peg_test, 072-a〜e_toy_airplane, 073-a〜g_lego_duplo, 076_timer, 077_rubiks_cube
 
 </details>
+
+### 利用不可のオブジェクト (25個)
+
+google_16k形式が存在しないため除外:
+001_chips_can, 023_wine_glass, 027-skillet, 033_spatula, 039_key, 041_small_marker, 046_plastic_bolt, 047_plastic_nut, 049_small_clamp, 063-c〜f_marbles, 072-f〜k_toy_airplane, 073-h〜m_lego_duplo
 
 ## 設定ファイル
 
@@ -320,9 +319,17 @@ rendering:
   use_gpu: true
 
 camera:
-  distance: [0.4, 2.0]
-  elevation: [10, 70]
+  distance: [0.4, 0.9]          # オブジェクトが大きく写る距離
+  elevation: [35, 65]           # テーブルを見下ろす角度
   azimuth: [0, 360]
+
+lighting:
+  num_lights: [2, 5]
+  intensity: [500, 2000]        # 明るめの照明
+  ambient: [0.3, 0.7]
+
+placement:
+  use_physics: false            # 物理シミュレーション無効（オブジェクト固定）
 ```
 
 ### 学習設定 (`scripts/training/train_config.yaml`)
@@ -331,7 +338,7 @@ camera:
 model:
   architecture: yolo26n         # nano / small / medium
   weights: /workspace/weights/yolo26n.pt
-  num_classes: 103
+  num_classes: 78               # google_16k形式で利用可能なクラス数
 
 training:
   epochs: 100
@@ -405,18 +412,26 @@ services:
 docker compose build yolo26_train --no-cache
 ```
 
-### OBJファイルの警告
-
-`Invalid normal index`警告は無害。YCBモデルのメッシュ問題で、レンダリングに影響なし。
-
 ### YCBモデルが見つからない
 
-モデルが以下のいずれかの構造であることを確認:
+google_16k形式のモデルが必要です:
 
 ```
-models/ycb/{object_name}/poisson/textured.obj     # 標準YCB構造（推奨）
-models/ycb/{object_name}/{object_name}/poisson/textured.obj
-models/ycb/{object_name}/textured.obj
+models/ycb/{object_name}/google_16k/textured.obj
+```
+
+ダウンロード:
+```bash
+python scripts/download_ycb_models.py --all --format google_16k
+```
+
+### テクスチャが壊れて表示される
+
+`berkeley`形式（poisson）を使用している可能性があります。`google_16k`形式を使用してください:
+
+```bash
+# google_16k形式で再ダウンロード
+python scripts/download_ycb_models.py --all --format google_16k --force
 ```
 
 ### docker-composeエラー

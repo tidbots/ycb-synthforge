@@ -14,8 +14,17 @@ from pathlib import Path
 from urllib.request import urlretrieve
 from urllib.error import URLError, HTTPError
 
-# YCB dataset base URL
-YCB_BASE_URL = "http://ycb-benchmarks.s3-website-us-east-1.amazonaws.com/data/berkeley"
+# YCB dataset base URLs
+YCB_BASE_URL_BERKELEY = "http://ycb-benchmarks.s3-website-us-east-1.amazonaws.com/data/berkeley"
+YCB_BASE_URL_GOOGLE = "http://ycb-benchmarks.s3-website-us-east-1.amazonaws.com/data/google"
+
+# Available model formats
+MODEL_FORMATS = {
+    "berkeley": "{base}/{obj}/{obj}_berkeley_meshes.tgz",
+    "google_16k": "{base}/{obj}_google_16k.tgz",
+    "google_64k": "{base}/{obj}_google_64k.tgz",
+    "google_512k": "{base}/{obj}_google_512k.tgz",
+}
 
 # All 103 YCB objects
 YCB_OBJECTS = [
@@ -205,6 +214,7 @@ def download_object(
     output_dir: Path,
     keep_tgz: bool = False,
     force: bool = False,
+    model_format: str = "berkeley",
 ) -> bool:
     """Download and extract a single YCB object.
 
@@ -213,13 +223,22 @@ def download_object(
         output_dir: Directory to save the model
         keep_tgz: Keep the tgz file after extraction
         force: Force re-download even if exists
+        model_format: Model format to download ('berkeley', 'google_16k', 'google_64k', 'google_512k')
 
     Returns:
         True if successful, False otherwise
     """
     obj_dir = output_dir / obj_name
-    tgz_file = output_dir / f"{obj_name}_berkeley_meshes.tgz"
-    url = f"{YCB_BASE_URL}/{obj_name}/{obj_name}_berkeley_meshes.tgz"
+
+    # Determine URL based on format
+    if model_format == "berkeley":
+        base_url = YCB_BASE_URL_BERKELEY
+        tgz_file = output_dir / f"{obj_name}_berkeley_meshes.tgz"
+        url = f"{base_url}/{obj_name}/{obj_name}_berkeley_meshes.tgz"
+    else:
+        base_url = YCB_BASE_URL_GOOGLE
+        tgz_file = output_dir / f"{obj_name}_{model_format}.tgz"
+        url = f"{base_url}/{obj_name}_{model_format}.tgz"
 
     # Check if already exists
     if obj_dir.exists() and not force:
@@ -345,6 +364,12 @@ Examples:
         action="store_true",
         help="List categories and their objects",
     )
+    parser.add_argument(
+        "--format",
+        choices=["berkeley", "google_16k", "google_64k", "google_512k"],
+        default="berkeley",
+        help="Model format to download (default: berkeley). google_16k recommended for Blender",
+    )
 
     args = parser.parse_args()
 
@@ -397,6 +422,7 @@ Examples:
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Downloading YCB models to: {args.output_dir}")
+    print(f"Format: {args.format}")
     print(f"Objects: {len(objects_to_download)}")
     print("=" * 60)
 
@@ -405,7 +431,7 @@ Examples:
 
     for i, obj_name in enumerate(objects_to_download):
         print(f"\n[{i+1}/{len(objects_to_download)}] {obj_name}")
-        if download_object(obj_name, args.output_dir, args.keep_tgz, args.force):
+        if download_object(obj_name, args.output_dir, args.keep_tgz, args.force, args.format):
             success_count += 1
         else:
             failed.append(obj_name)

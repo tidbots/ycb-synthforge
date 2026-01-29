@@ -15,8 +15,8 @@ scene:
 
 # Camera settings
 camera:
-  distance: [0.3, 0.8]  # Distance from scene center (meters) - closer for larger objects
-  elevation: [10, 70]  # Camera elevation angle (degrees)
+  distance: [0.4, 0.9]  # Distance from scene center (meters) - closer for larger objects
+  elevation: [35, 65]  # Camera elevation angle (degrees) - looking down at table
   azimuth: [0, 360]  # Camera azimuth angle (degrees)
   # Camera effects
   exposure:
@@ -37,14 +37,14 @@ camera:
 
 # Lighting settings
 lighting:
-  num_lights: [1, 4]
+  num_lights: [2, 5]
   color_temperature: [2700, 6500]  # Kelvin
-  intensity: [100, 1000]  # Watts equivalent
+  intensity: [500, 2000]  # Watts equivalent - increased for brighter scenes
   elevation: [30, 90]  # degrees
   azimuth: [0, 360]  # degrees
-  ambient: [0.1, 0.5]
+  ambient: [0.3, 0.7]  # Increased ambient for better visibility
   shadow_softness: [0.3, 0.9]
-  use_hdri: true
+  use_hdri: false  # Disabled - no HDRI files available
   hdri_rotation: [0, 360]
 
 # Background/Environment settings
@@ -100,11 +100,11 @@ materials:
 
 # Object placement
 placement:
-  # Position randomization
+  # Position randomization - tighter grouping for better visibility
   position:
-    x_range: [-0.3, 0.3]
-    y_range: [-0.3, 0.3]
-    z_range: [0, 0.3]
+    x_range: [-0.15, 0.15]
+    y_range: [-0.15, 0.15]
+    z_range: [0, 0.2]
   # Rotation randomization
   rotation:
     x: [0, 360]
@@ -112,8 +112,8 @@ placement:
     z: [0, 360]
   # Scale variation (manufacturing tolerance)
   scale_variation: [-0.05, 0.05]  # ±5%
-  # Physics simulation
-  use_physics: true
+  # Physics simulation - disabled to keep objects on table
+  use_physics: false
   physics_steps: 100
 
 # Rendering settings

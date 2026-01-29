@@ -363,11 +363,11 @@ class SceneSetup:
             walls = self.create_walls(room_size)
             result["walls"] = walls
 
-        # Create table (optional)
-        if include_table and random.random() < 0.8:  # 80% chance of table
-            table_height = random.uniform(0.5, 0.9)
+        # Create table (always create for consistent object placement)
+        if include_table:
+            table_height = random.uniform(0.65, 0.75)  # Consistent height
             table = self.create_table(
-                size=(random.uniform(0.8, 1.5), random.uniform(0.5, 1.0), table_height),
+                size=(random.uniform(0.5, 0.7), random.uniform(0.4, 0.6), table_height),
                 location=(0, 0, 0),
             )
             result["table"] = table
