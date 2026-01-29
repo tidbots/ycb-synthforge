@@ -63,7 +63,8 @@ ycb_synthforge/
 
 ### 必要環境
 
-- Docker & Docker Compose v2+
+- Docker & Docker Compose v2+ (`docker compose` コマンドを使用)
+  - 注意: 旧版の `docker-compose` (v1.x) は非対応
 - NVIDIA GPU (CUDA対応)
 - NVIDIA Container Toolkit
 - 推奨: RTX 3090/4090 (VRAM 24GB)
@@ -180,27 +181,31 @@ python scripts/download_cctextures.py --search Marble --limit 30
 ### 1. 合成データ生成
 
 ```bash
-# バックグラウンドで12,000枚生成
-docker compose run -d --name ycb_generation blenderproc \
-  blenderproc run /workspace/scripts/blenderproc/generate_dataset.py \
-  --config /workspace/scripts/blenderproc/config.yaml \
-  --output /workspace/data/synthetic/coco \
-  --num_scenes 12000
+# バックグラウンドで生成（config.yamlのnum_images設定に従う）
+docker compose run -d blenderproc
 
-# 進捗確認
-watch -n 30 'ls data/synthetic/coco/images/ | wc -l'
+# コンテナIDを確認
+docker ps | grep blenderproc
 
-# ログ確認
-docker logs ycb_generation --tail 20
+# 進捗確認（生成された画像数）
+ls data/synthetic/coco/images/ | wc -l
+
+# リアルタイムログ確認
+docker logs -f <container_id>
+
+# または最新ログのみ
+docker logs --tail 30 <container_id>
 ```
+
+生成枚数は `scripts/blenderproc/config.yaml` の `scene.num_images` で設定（デフォルト: 12,000枚）。
 
 ### 2. COCO→YOLO形式変換
 
 ```bash
 docker compose run --rm yolo26_train python \
-  /workspace/scripts/data_processing/coco_to_yolo.py \
-  --coco_json /workspace/data/synthetic/coco/annotations.json \
-  --output_dir /workspace/data/synthetic/yolo \
+  scripts/data_processing/coco_to_yolo.py \
+  --coco_json data/synthetic/coco/annotations.json \
+  --output_dir data/synthetic/yolo \
   --train_ratio 0.833 \
   --val_ratio 0.083 \
   --test_ratio 0.083
@@ -210,25 +215,25 @@ docker compose run --rm yolo26_train python \
 
 ```bash
 docker compose run --rm yolo26_train python \
-  /workspace/scripts/training/train_yolo26.py \
-  --config /workspace/scripts/training/train_config.yaml
+  scripts/training/train_yolo26.py \
+  --config scripts/training/train_config.yaml
 ```
 
 ### 4. 評価
 
 ```bash
 docker compose run --rm yolo26_train python \
-  /workspace/scripts/training/evaluate.py \
-  --weights /workspace/runs/ycb_yolo26/weights/best.pt \
-  --data /workspace/data/synthetic/yolo/dataset.yaml
+  scripts/training/evaluate.py \
+  --weights runs/ycb_yolo26/weights/best.pt \
+  --data data/synthetic/yolo/dataset.yaml
 ```
 
 ### 5. 推論
 
 ```bash
 docker compose run --rm yolo26_inference python \
-  /workspace/scripts/training/inference.py \
-  --weights /workspace/runs/ycb_yolo26/weights/best.pt \
+  scripts/training/inference.py \
+  --weights runs/ycb_yolo26/weights/best.pt \
   --source /path/to/images
 ```
 
@@ -377,7 +382,7 @@ runs/ycb_yolo26/
 nvidia-smi
 
 # コンテナ内で確認
-docker compose run --rm blenderproc nvidia-smi
+docker compose run --rm yolo26_train nvidia-smi
 ```
 
 ### メモリ不足エラー
@@ -403,6 +408,29 @@ docker compose build yolo26_train --no-cache
 ### OBJファイルの警告
 
 `Invalid normal index`警告は無害。YCBモデルのメッシュ問題で、レンダリングに影響なし。
+
+### YCBモデルが見つからない
+
+モデルが以下のいずれかの構造であることを確認:
+
+```
+models/ycb/{object_name}/poisson/textured.obj     # 標準YCB構造（推奨）
+models/ycb/{object_name}/{object_name}/poisson/textured.obj
+models/ycb/{object_name}/textured.obj
+```
+
+### docker-composeエラー
+
+旧版 `docker-compose` (v1.x) ではCompose file形式が非対応:
+
+```bash
+# エラー例
+The Compose file is invalid because: Unsupported config option for services
+
+# 解決: docker compose (v2+) を使用
+docker compose run -d blenderproc  # ○ 正しい
+docker-compose run -d blenderproc  # × 旧版は非対応
+```
 
 ## ライセンス
 

@@ -69,12 +69,17 @@ def get_ycb_model_paths(ycb_dir: str) -> Dict[str, str]:
         if obj_path.exists():
             model_paths[obj_name] = str(obj_path)
         else:
-            # Try alternative structure
-            alt_path = ycb_path / obj_name / "textured.obj"
+            # Try actual YCB dataset structure: ycb/{name}/poisson/textured.obj
+            alt_path = ycb_path / obj_name / "poisson" / "textured.obj"
             if alt_path.exists():
                 model_paths[obj_name] = str(alt_path)
             else:
-                logger.warning(f"Model not found for {obj_name}")
+                # Try flat structure: ycb/{name}/textured.obj
+                flat_path = ycb_path / obj_name / "textured.obj"
+                if flat_path.exists():
+                    model_paths[obj_name] = str(flat_path)
+                else:
+                    logger.warning(f"Model not found for {obj_name}")
 
     logger.info(f"Found {len(model_paths)} YCB models")
     return model_paths
