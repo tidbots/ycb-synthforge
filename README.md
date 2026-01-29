@@ -1,2 +1,5 @@
-# ycb_synthforge
-YCB  SynthForge
+#
+
+Claude Codeで生成した
+
+
