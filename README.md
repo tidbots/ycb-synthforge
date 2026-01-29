@@ -201,6 +201,11 @@ docker logs --tail 30 <container_id>
 
 生成枚数は `scripts/blenderproc/config.yaml` の `scene.num_images` で設定（デフォルト: 12,000枚）。
 
+
+![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000009.png)
+![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000013.png)
+![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000029.png)
+
 ### 2. COCO→YOLO形式変換
 
 ```bash
