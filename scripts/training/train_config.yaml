@@ -1,0 +1,53 @@
+# YOLO26 Training Configuration
+# Stage 1: Fine-tuning on synthetic data
+
+# Model settings
+model: yolo26m.pt  # Base model (COCO pretrained)
+
+# Training settings
+epochs: 50
+batch: 16
+imgsz: 640
+optimizer: auto  # auto selects best optimizer (MuSGD for YOLO26)
+lr0: 0.01  # Initial learning rate
+lrf: 0.01  # Final learning rate (lr0 * lrf)
+momentum: 0.937
+weight_decay: 0.0005
+warmup_epochs: 3.0
+warmup_momentum: 0.8
+warmup_bias_lr: 0.1
+
+# Early stopping
+patience: 50  # Epochs to wait before early stopping
+
+# Save settings
+save_period: 10  # Save checkpoint every N epochs
+
+# Data augmentation (conservative for synthetic data)
+# Synthetic data already has domain randomization applied
+augmentation:
+  hsv_h: 0.01  # Hue augmentation (fraction)
+  hsv_s: 0.5   # Saturation augmentation (fraction)
+  hsv_v: 0.3   # Value augmentation (fraction)
+  degrees: 5.0  # Rotation (+/- degrees)
+  translate: 0.05  # Translation (+/- fraction)
+  scale: 0.3   # Scale (+/- gain)
+  shear: 0.0   # Shear (+/- degrees)
+  perspective: 0.0  # Perspective (+/- fraction)
+  flipud: 0.0  # Flip up-down probability
+  fliplr: 0.5  # Flip left-right probability
+  mosaic: 0.5  # Mosaic augmentation probability
+  mixup: 0.0   # Mixup augmentation probability
+  copy_paste: 0.0  # Copy-paste augmentation probability
+
+# Loss weights
+box: 7.5  # Box loss weight
+cls: 0.5  # Classification loss weight
+dfl: 1.5  # Distribution focal loss weight
+
+# Other settings
+workers: 8
+cache: false  # Cache images for faster training (requires RAM)
+rect: false   # Rectangular training
+cos_lr: false  # Cosine learning rate scheduler
+close_mosaic: 10  # Disable mosaic last N epochs

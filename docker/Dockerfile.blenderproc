@@ -1,0 +1,67 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+# System dependencies including X11 libraries required by Blender
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    python3.10-venv \
+    # OpenGL and rendering
+    libgl1-mesa-glx \
+    libgl1-mesa-dri \
+    libegl1-mesa \
+    libglu1-mesa \
+    # X11 libraries required by Blender
+    libxi6 \
+    libxkbcommon0 \
+    libxxf86vm1 \
+    libxfixes3 \
+    libxcursor1 \
+    libxinerama1 \
+    libxrandr2 \
+    # Other required libraries
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
+    libxcb1 \
+    libx11-6 \
+    # Audio (required by Blender even for headless)
+    libopenal1 \
+    libsndfile1 \
+    # Tools
+    wget \
+    unzip \
+    git \
+    xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symbolic links for python
+RUN ln -sf /usr/bin/python3.10 /usr/bin/python3 && \
+    ln -sf /usr/bin/python3.10 /usr/bin/python
+
+# Upgrade pip
+RUN python3 -m pip install --upgrade pip
+
+# Install BlenderProc and dependencies
+RUN pip3 install --no-cache-dir \
+    blenderproc \
+    numpy \
+    opencv-python-headless \
+    pycocotools \
+    pyyaml \
+    tqdm \
+    Pillow
+
+WORKDIR /workspace
+
+# Set environment for BlenderProc
+ENV BLENDER_PATH=/root/blender
+
+# Pre-download Blender to avoid download on each run
+RUN blenderproc pip install numpy && echo "Blender downloaded"
+
+CMD ["blenderproc", "run", "scripts/blenderproc/generate_dataset.py"]

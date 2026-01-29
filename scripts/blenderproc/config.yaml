@@ -1,0 +1,139 @@
+# BlenderProc Data Generation Configuration
+# YCB Object Detection with Domain Randomization
+
+# Output settings
+output:
+  base_dir: "/workspace/data/synthetic/coco"
+  image_format: "png"
+  resolution: [640, 640]
+
+# Scene settings
+scene:
+  num_images: 12000  # Total images to generate (10k train, 1k val, 1k test)
+  objects_per_scene: [2, 8]  # Min-max YCB objects per scene
+  clutter_per_scene: [3, 15]  # Min-max clutter objects
+
+# Camera settings
+camera:
+  distance: [0.4, 2.0]  # Distance from scene center (meters)
+  elevation: [10, 70]  # Camera elevation angle (degrees)
+  azimuth: [0, 360]  # Camera azimuth angle (degrees)
+  # Camera effects
+  exposure:
+    ev_range: [-1.5, 1.5]
+  noise:
+    iso_values: [100, 200, 400, 800, 1600, 3200]
+  white_balance:
+    temp_offset: [-1000, 1000]  # Kelvin
+  blur:
+    motion_blur: [0, 0.05]
+    depth_of_field:
+      fstop: [1.8, 11.0]
+      focus_offset: [-0.2, 0.2]  # meters
+  lens_distortion:
+    barrel: [-0.1, 0]
+    pincushion: [0, 0.1]
+    vignette: [0, 0.3]
+
+# Lighting settings
+lighting:
+  num_lights: [1, 4]
+  color_temperature: [2700, 6500]  # Kelvin
+  intensity: [100, 1000]  # Watts equivalent
+  elevation: [30, 90]  # degrees
+  azimuth: [0, 360]  # degrees
+  ambient: [0.1, 0.5]
+  shadow_softness: [0.3, 0.9]
+  use_hdri: true
+  hdri_rotation: [0, 360]
+
+# Background/Environment settings
+background:
+  # Floor textures
+  floor:
+    categories:
+      - "Wood"
+      - "Concrete"
+      - "Tiles"
+      - "Marble"
+      - "Metal"
+      - "Fabric"
+    texture_scale: [0.5, 2.0]
+    hue_shift: [-30, 30]  # degrees
+    brightness: [0.7, 1.3]
+    wear_overlay: [0, 0.4]
+  # Wall textures
+  wall:
+    categories:
+      - "Concrete"
+      - "Plaster"
+      - "Brick"
+      - "Paint"
+      - "Wallpaper"
+    texture_scale: [0.5, 2.0]
+  # Table/shelf textures
+  surface:
+    categories:
+      - "Wood"
+      - "Metal"
+      - "Plastic"
+
+# Material randomization
+materials:
+  # Metal objects (cans, etc.)
+  metallic:
+    metallic_range: [0.8, 1.0]
+    roughness_range: [0.05, 0.3]
+    specular_range: [0.5, 1.0]
+  # Glossy boxes
+  glossy:
+    metallic_range: [0.0, 0.0]
+    roughness_range: [0.1, 0.5]
+    specular_range: [0.3, 0.7]
+  # Plastic objects
+  plastic:
+    roughness_range: [0.2, 0.6]
+    subsurface: [0, 0.1]
+  # General PBR
+  base_color_hue_shift: [-10, 10]  # degrees
+  normal_map_strength: [0.5, 1.5]
+
+# Object placement
+placement:
+  # Position randomization
+  position:
+    x_range: [-0.3, 0.3]
+    y_range: [-0.3, 0.3]
+    z_range: [0, 0.3]
+  # Rotation randomization
+  rotation:
+    x: [0, 360]
+    y: [0, 360]
+    z: [0, 360]
+  # Scale variation (manufacturing tolerance)
+  scale_variation: [-0.05, 0.05]  # ±5%
+  # Physics simulation
+  use_physics: true
+  physics_steps: 100
+
+# Rendering settings
+rendering:
+  engine: "CYCLES"
+  samples: 32
+  use_denoising: true
+  use_gpu: true
+
+# Paths (relative to /workspace)
+paths:
+  ycb_models: "/workspace/models/ycb"
+  textures: "/workspace/resources/cctextures"
+  hdri: "/workspace/resources/hdri"  # Optional
+
+# Random seed for reproducibility
+seed: 42
+
+# Domain randomization levels
+# Level 1: Basic (lighting, camera exposure, object pose)
+# Level 2: Moderate (+ textures, multiple lights, noise, clutter)
+# Level 3: Advanced (+ material params, lens effects, complex reflections)
+domain_randomization_level: 2

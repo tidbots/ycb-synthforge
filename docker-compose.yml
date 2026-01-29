@@ -1,0 +1,60 @@
+services:
+  blenderproc:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.blenderproc
+    volumes:
+      - ./models:/workspace/models:ro
+      - ./resources:/workspace/resources:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./data:/workspace/data
+    environment:
+      - BLENDERPROC_THREADS=8
+    shm_size: '8gb'
+    stdin_open: true
+    tty: true
+
+  yolo26_train:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.yolo26
+    volumes:
+      - ./data:/workspace/data
+      - ./weights:/workspace/weights
+      - ./scripts:/workspace/scripts:ro
+      - ./outputs:/workspace/outputs
+      - ./runs:/workspace/runs
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    shm_size: '16gb'
+    stdin_open: true
+    tty: true
+
+  yolo26_inference:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.yolo26
+    volumes:
+      - ./data:/workspace/data:ro
+      - ./weights:/workspace/weights:ro
+      - ./outputs:/workspace/outputs
+      - ./scripts:/workspace/scripts:ro
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    shm_size: '8gb'
+    stdin_open: true
+    tty: true

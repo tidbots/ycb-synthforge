@@ -1,0 +1,36 @@
+FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN pip install --upgrade pip
+
+# Install Ultralytics (YOLO26) and dependencies
+# Pin numpy<2 for PyTorch 2.1 compatibility
+RUN pip install --no-cache-dir \
+    "numpy<2" \
+    ultralytics \
+    opencv-python-headless \
+    pycocotools \
+    pyyaml \
+    tqdm \
+    scikit-learn \
+    matplotlib \
+    seaborn \
+    pandas \
+    tensorboard
+
+WORKDIR /workspace
+
+CMD ["bash"]
