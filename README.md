@@ -294,6 +294,28 @@ docker compose run --rm \
 ![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/inference_sample2.jpg)
 ![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/inference_sample3.jpg)
 
+### 6. リアルタイム検出 (Webカメラ)
+
+USB Webカメラを使用したリアルタイム物体検出:
+
+```bash
+# Docker経由で実行
+./run_realtime_detection.sh
+
+# オプション指定
+./run_realtime_detection.sh --camera 0 --conf 0.5
+
+# ホストで直接実行（要: pip install ultralytics opencv-python）
+./run_realtime_detection_host.sh
+```
+
+**操作方法:**
+| キー | 動作 |
+|------|------|
+| `q` | 終了 |
+| `s` | スクリーンショット保存 |
+| `c` | 信頼度表示の切り替え |
+
 ## ドメインランダム化
 
 Sim-to-Realギャップを軽減するため、以下の要素をランダム化:
