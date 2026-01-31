@@ -4,12 +4,12 @@ BlenderProcによる合成データ生成とYOLO26によるYCB物体検出パイ
 
 ## 概要
 
-YCB SynthForgeは、76種類のYCBオブジェクトを検出するためのEnd-to-Endパイプラインです。
+YCB SynthForgeは、85種類のYCBオブジェクトを検出するためのEnd-to-Endパイプラインです。
 
 - **合成データ生成**: BlenderProcによるフォトリアリスティックなレンダリング
 - **ドメインランダム化**: Sim-to-Real転移のための多様なデータ生成
 - **YOLO26学習**: COCO事前学習モデルのファインチューニング
-- **google_16k形式**: 高品質なテクスチャ付きメッシュを使用
+- **google_16k + tsdf形式**: オブジェクトごとに最適な形式を自動選択
 
 ## プロジェクト構成
 
@@ -20,7 +20,7 @@ ycb_synthforge/
 │   └── Dockerfile.yolo26         # YOLO26学習環境
 ├── docker-compose.yml
 ├── models/
-│   └── ycb/                      # YCB 3Dモデル (76クラス, google_16k形式)
+│   └── ycb/                      # YCB 3Dモデル (85クラス, google_16k/tsdf形式)
 ├── resources/
 │   └── cctextures/               # CC0テクスチャ (2022枚)
 ├── weights/
@@ -30,6 +30,9 @@ ycb_synthforge/
 │   ├── download_weights.py       # YOLO26重みダウンロード
 │   ├── download_ycb_models.py    # YCB 3Dモデルダウンロード
 │   ├── download_cctextures.py    # CC0テクスチャダウンロード
+│   ├── fix_tsdf_materials.py     # tsdf形式のマテリアル修正
+│   ├── validate_meshes.py        # メッシュ品質検証
+│   ├── generate_thumbnails.py    # サムネイル生成
 │   ├── blenderproc/              # データ生成スクリプト
 │   │   ├── generate_dataset.py   # メイン生成スクリプト
 │   │   ├── config.yaml           # 生成設定
@@ -119,7 +122,7 @@ python scripts/download_weights.py --models yolo26m --force
 
 ### YCB 3Dモデルのダウンロード
 
-**重要**: `google_16k`形式を使用してください。`berkeley`形式（poisson）はBlenderでテクスチャが壊れる問題があります。
+**重要**: 本プロジェクトでは`google_16k`形式を基本とし、一部オブジェクトで`tsdf`形式を使用します。
 
 ```bash
 # オブジェクト一覧を表示
@@ -128,8 +131,11 @@ python scripts/download_ycb_models.py --list
 # カテゴリ一覧を表示
 python scripts/download_ycb_models.py --list-categories
 
-# 全オブジェクトをgoogle_16k形式でダウンロード（推奨）
+# 全オブジェクトをgoogle_16k形式でダウンロード
 python scripts/download_ycb_models.py --all --format google_16k
+
+# tsdf形式もダウンロード（一部オブジェクトで必要）
+python scripts/download_ycb_models.py --all --format berkeley
 
 # カテゴリ指定でダウンロード
 python scripts/download_ycb_models.py --category food fruit kitchen --format google_16k
@@ -141,14 +147,24 @@ python scripts/download_ycb_models.py --objects 003_cracker_box 005_tomato_soup_
 python scripts/download_ycb_models.py --all --format google_16k --force
 ```
 
-| 形式 | 説明 | 推奨 |
+| 形式 | 説明 | 用途 |
 |------|------|------|
-| google_16k | 16kポリゴン、高品質テクスチャ | ✅ 推奨 |
+| google_16k | 16kポリゴン、高品質テクスチャ | ✅ 基本形式（72オブジェクト） |
+| tsdf | TSDF再構成メッシュ | ✅ 一部オブジェクトで使用（13オブジェクト） |
 | google_64k | 64kポリゴン、より高解像度 | |
 | google_512k | 512kポリゴン、最高解像度 | |
-| berkeley | poisson/tsdf形式（非推奨） | ❌ テクスチャ破損あり |
+| poisson | poisson再構成（非推奨） | ❌ テクスチャ破損あり |
 
-**注意**: google_16k形式は103オブジェクト中78オブジェクトで利用可能ですが、メッシュ品質の問題により2オブジェクトを除外し、実際には76オブジェクトを使用します。
+### tsdf形式のマテリアル修正
+
+tsdf形式のOBJファイルはマテリアル参照が欠落しているため、初回ダウンロード後に修正が必要です:
+
+```bash
+# tsdf形式のOBJファイルを修正（usemtl行を追加）
+docker compose run --rm fix_tsdf_materials
+```
+
+**注意**: 修正前のファイルは `.obj.backup` として自動保存されます。
 
 ### CC0テクスチャのダウンロード
 
@@ -316,6 +332,38 @@ USB Webカメラを使用したリアルタイム物体検出:
 | `s` | スクリーンショット保存 |
 | `c` | 信頼度表示の切り替え |
 
+## ユーティリティ
+
+### メッシュ検証
+
+YCBオブジェクトのメッシュ品質を自動検証:
+
+```bash
+docker compose run --rm mesh_validator
+```
+
+結果は `data/mesh_validation_results.json` に保存されます。
+
+### サムネイル生成
+
+全オブジェクトのgoogle_16k/tsdf形式を比較するサムネイルを生成:
+
+```bash
+docker compose run --rm thumbnail_generator
+```
+
+結果:
+- `data/thumbnails/*.png` - 個別サムネイル
+- `data/thumbnails/comparison_grid.png` - 比較グリッド
+
+### tsdfマテリアル修正
+
+tsdf形式のOBJファイルにマテリアル参照を追加:
+
+```bash
+docker compose run --rm fix_tsdf_materials
+```
+
 ## ドメインランダム化
 
 Sim-to-Realギャップを軽減するため、以下の要素をランダム化:
@@ -350,40 +398,53 @@ Sim-to-Realギャップを軽減するため、以下の要素をランダム化
 | Val | 1,000 | 8.3% | ハイパーパラメータ調整 |
 | Test | 1,000 | 8.3% | 最終評価 |
 
-## YCBオブジェクトクラス (76種 - google_16k形式)
+## YCBオブジェクトクラス (85種)
 
 <details>
 <summary>利用可能なクラス一覧を表示</summary>
 
-### 食品・飲料 (9個)
-002_master_chef_can, 003_cracker_box, 004_sugar_box, 005_tomato_soup_can, 006_mustard_bottle, 007_tuna_fish_can, 008_pudding_box, 009_gelatin_box, 010_potted_meat_can
+### 食品・飲料 (10個)
+001_chips_can*, 002_master_chef_can, 003_cracker_box, 004_sugar_box, 005_tomato_soup_can, 006_mustard_bottle, 007_tuna_fish_can, 008_pudding_box, 009_gelatin_box, 010_potted_meat_can
 
 ### 果物 (8個)
 011_banana, 012_strawberry, 013_apple, 014_lemon, 015_peach, 016_pear, 017_orange, 018_plum
 
-### キッチン用品 (9個)
-021_bleach_cleanser, 024_bowl, 025_mug, 026_sponge, 028_skillet_lid, 029_plate, 030_fork, 031_spoon, 032_knife
+### キッチン用品 (11個)
+019_pitcher_base, 021_bleach_cleanser, 022_windex_bottle, 023_wine_glass*, 024_bowl, 025_mug, 026_sponge, 028_skillet_lid, 029_plate, 030_fork, 031_spoon, 032_knife, 033_spatula
 
-### 工具 (12個)
-035_power_drill, 036_wood_block, 037_scissors, 038_padlock, 040_large_marker, 042_adjustable_wrench, 043_phillips_screwdriver, 044_flat_screwdriver, 048_hammer, 050_medium_clamp, 051_large_clamp, 052_extra_large_clamp
+### 工具 (14個)
+035_power_drill, 036_wood_block, 037_scissors, 038_padlock, 040_large_marker, 041_small_marker*, 042_adjustable_wrench, 043_phillips_screwdriver, 044_flat_screwdriver, 048_hammer, 049_small_clamp*, 050_medium_clamp, 051_large_clamp, 052_extra_large_clamp
 
 ### スポーツ (6個)
-053_mini_soccer_ball, 054_softball, 055_baseball, 056_tennis_ball, 057_racquetball, 058_golf_ball
+053_mini_soccer_ball, 054_softball, 055_baseball, 056_tennis_ball, 057_racquetball, 058_golf_ball*
 
-### その他 (32個)
-059_chain, 061_foam_brick, 062_dice, 063-a_marbles, 063-b_marbles, 065-a〜j_cups, 070-a/b_colored_wood_blocks, 071_nine_hole_peg_test, 072-a〜e_toy_airplane, 073-a〜g_lego_duplo, 077_rubiks_cube
+### その他 (36個)
+059_chain, 061_foam_brick, 062_dice*, 063-a_marbles, 063-b_marbles, 065-a〜j_cups, 070-a/b_colored_wood_blocks, 071_nine_hole_peg_test, 072-a_toy_airplane, 073-a〜m_lego_duplo*, 076_timer*, 077_rubiks_cube
+
+**\*** tsdf形式を使用
 
 </details>
 
-### 除外オブジェクト
+### メッシュ形式の選択
 
-#### メッシュ品質問題により除外 (2個)
-以下のオブジェクトはgoogle_16k形式でもメッシュが歪んで表示されるため除外:
-- `019_pitcher_base` - メッシュが変形して表示される
-- `022_windex_bottle` - メッシュが潰れて表示される
+| 形式 | 使用オブジェクト数 | 説明 |
+|------|------------------|------|
+| google_16k | 72個 | 高品質テクスチャ、基本形式 |
+| tsdf | 13個 | google_16kで品質問題があるオブジェクト |
 
-#### google_16k形式が存在しないため除外 (25個)
-001_chips_can, 023_wine_glass, 027-skillet, 033_spatula, 039_key, 041_small_marker, 046_plastic_bolt, 047_plastic_nut, 049_small_clamp, 063-c〜f_marbles, 072-f〜k_toy_airplane, 073-h〜m_lego_duplo, 076_timer
+#### tsdf形式を使用するオブジェクト (13個)
+```
+001_chips_can, 041_small_marker, 049_small_clamp, 058_golf_ball, 062_dice,
+073-g〜m_lego_duplo (7個), 076_timer
+```
+
+### 除外オブジェクト (6個)
+
+以下のオブジェクトはgoogle_16k/tsdf両形式でメッシュ品質に問題があるため除外:
+```
+072-b_toy_airplane, 072-c_toy_airplane, 072-d_toy_airplane,
+072-e_toy_airplane, 072-h_toy_airplane, 072-k_toy_airplane
+```
 
 ## 設定ファイル
 
@@ -423,7 +484,7 @@ placement:
 model:
   architecture: yolo26n         # nano / small / medium
   weights: /workspace/weights/yolo26n.pt
-  num_classes: 76               # 利用可能なクラス数（除外オブジェクトを除く）
+  num_classes: 85               # 利用可能なクラス数（除外オブジェクトを除く）
 
 training:
   epochs: 100
@@ -507,39 +568,72 @@ docker compose build yolo26_train --no-cache
 
 ### YCBモデルが見つからない
 
-google_16k形式のモデルが必要です:
+google_16kまたはtsdf形式のモデルが必要です:
 
 ```
 models/ycb/{object_name}/google_16k/textured.obj
+models/ycb/{object_name}/tsdf/textured.obj
 ```
 
 ダウンロード:
 ```bash
+# google_16k形式
 python scripts/download_ycb_models.py --all --format google_16k
+
+# tsdf形式（一部オブジェクトで必要）
+python scripts/download_ycb_models.py --all --format berkeley
+```
+
+### tsdf形式でテクスチャが表示されない
+
+tsdf形式のOBJファイルはマテリアル参照（usemtl）が欠落しています。修正スクリプトを実行してください:
+
+```bash
+docker compose run --rm fix_tsdf_materials
 ```
 
 ### テクスチャが壊れて表示される
 
-`berkeley`形式（poisson）を使用している可能性があります。`google_16k`形式を使用してください:
-
-```bash
-# google_16k形式で再ダウンロード
-python scripts/download_ycb_models.py --all --format google_16k --force
-```
+`poisson`形式を使用している可能性があります。`google_16k`または`tsdf`形式を使用してください。
 
 ### 特定のオブジェクトのメッシュが歪む
 
-一部のオブジェクト（`019_pitcher_base`, `022_windex_bottle`）はgoogle_16k形式でもメッシュ品質に問題があります。これらは`generate_dataset.py`の`EXCLUDED_OBJECTS`で除外済みです。
+メッシュ品質を確認するには、サムネイル生成スクリプトを使用:
 
-他のオブジェクトでも同様の問題が発生する場合は、除外リストに追加してください:
+```bash
+# サムネイル生成（全オブジェクトのgoogle_16k/tsdf比較）
+docker compose run --rm thumbnail_generator
+
+# 結果を確認
+xdg-open data/thumbnails/comparison_grid.png
+```
+
+問題のあるオブジェクトを発見した場合、`generate_dataset.py`で設定:
 
 ```python
 # scripts/blenderproc/generate_dataset.py
+
+# 完全に除外するオブジェクト
 EXCLUDED_OBJECTS = {
-    "019_pitcher_base",
-    "022_windex_bottle",
+    "072-b_toy_airplane",
     "問題のあるオブジェクト名",  # 追加
 }
+
+# tsdf形式を使用するオブジェクト（google_16kに問題がある場合）
+USE_TSDF_FORMAT = {
+    "001_chips_can",
+    "問題のあるオブジェクト名",  # 追加
+}
+```
+
+### メッシュ品質の自動検証
+
+```bash
+# メッシュの自動検証（Non-manifold edges等をチェック）
+docker compose run --rm mesh_validator
+
+# 結果を確認
+cat data/mesh_validation_results.json
 ```
 
 ### docker-composeエラー

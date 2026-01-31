@@ -54,7 +54,8 @@ RUN pip3 install --no-cache-dir \
     pycocotools \
     pyyaml \
     tqdm \
-    Pillow
+    Pillow \
+    trimesh
 
 WORKDIR /workspace
 

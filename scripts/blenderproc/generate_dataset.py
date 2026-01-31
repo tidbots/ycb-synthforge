@@ -50,16 +50,41 @@ def setup_random_seeds(seed: int) -> None:
     logger.info(f"Random seed set to {seed}")
 
 
-# Objects to exclude due to mesh/texture issues
+# Objects to completely exclude due to poor mesh quality in both formats
 EXCLUDED_OBJECTS = {
-    "019_pitcher_base",   # Mesh appears deformed/crumpled
-    "022_windex_bottle",  # Mesh appears deformed/crumpled
+    "072-b_toy_airplane",
+    "072-c_toy_airplane",
+    "072-d_toy_airplane",
+    "072-e_toy_airplane",
+    "072-h_toy_airplane",
+    "072-k_toy_airplane",
+}
+
+# Objects where tsdf format is preferred over google_16k
+# (google_16k has mesh/texture issues for these objects)
+USE_TSDF_FORMAT = {
+    "001_chips_can",
+    "041_small_marker",
+    "049_small_clamp",
+    "058_golf_ball",
+    "062_dice",
+    "073-g_lego_duplo",
+    "073-h_lego_duplo",
+    "073-i_lego_duplo",
+    "073-j_lego_duplo",
+    "073-k_lego_duplo",
+    "073-l_lego_duplo",
+    "073-m_lego_duplo",
+    "076_timer",
 }
 
 
 def get_ycb_model_paths(ycb_dir: str) -> Dict[str, str]:
     """
     Get paths to all YCB model OBJ files.
+
+    Prioritizes google_16k format for most objects, but uses tsdf format
+    for objects with known mesh issues in google_16k.
 
     Args:
         ycb_dir: Path to YCB models directory
@@ -73,15 +98,31 @@ def get_ycb_model_paths(ycb_dir: str) -> Dict[str, str]:
     for obj_name in YCB_CLASSES.values():
         # Skip excluded objects
         if obj_name in EXCLUDED_OBJECTS:
-            logger.info(f"Excluding {obj_name}: known mesh/texture issues")
+            logger.info(f"Excluding {obj_name}: poor mesh quality")
             continue
 
-        # ONLY use google_16k format (poisson format has corrupted normals)
         google_path = ycb_path / obj_name / "google_16k" / "textured.obj"
-        if google_path.exists():
-            model_paths[obj_name] = str(google_path)
+        tsdf_path = ycb_path / obj_name / "tsdf" / "textured.obj"
+
+        # For objects where tsdf is preferred
+        if obj_name in USE_TSDF_FORMAT:
+            if tsdf_path.exists():
+                model_paths[obj_name] = str(tsdf_path)
+                logger.info(f"Using tsdf format for {obj_name} (preferred)")
+            elif google_path.exists():
+                model_paths[obj_name] = str(google_path)
+                logger.warning(f"Using google_16k for {obj_name} (tsdf not available)")
+            else:
+                logger.warning(f"Skipping {obj_name}: no suitable format available")
         else:
-            logger.warning(f"Skipping {obj_name}: google_16k format not available")
+            # For normal objects, prefer google_16k, fallback to tsdf
+            if google_path.exists():
+                model_paths[obj_name] = str(google_path)
+            elif tsdf_path.exists():
+                model_paths[obj_name] = str(tsdf_path)
+                logger.info(f"Using tsdf format for {obj_name} (google_16k not available)")
+            else:
+                logger.warning(f"Skipping {obj_name}: no suitable format available")
 
     logger.info(f"Found {len(model_paths)} YCB models")
     return model_paths

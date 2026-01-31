@@ -58,3 +58,39 @@ services:
     shm_size: '8gb'
     stdin_open: true
     tty: true
+
+  mesh_validator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.blenderproc
+    volumes:
+      - ./models:/workspace/models:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./data:/workspace/data
+    command: ["python3", "/workspace/scripts/validate_meshes.py", "--ycb-dir", "/workspace/models/ycb", "--output", "/workspace/data/mesh_validation_results.json"]
+    stdin_open: true
+    tty: true
+
+  thumbnail_generator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.blenderproc
+    volumes:
+      - ./models:/workspace/models:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./data:/workspace/data
+    command: ["blenderproc", "run", "/workspace/scripts/generate_thumbnails.py", "--ycb-dir", "/workspace/models/ycb", "--output", "/workspace/data/thumbnails", "--comparison-grid"]
+    shm_size: '8gb'
+    stdin_open: true
+    tty: true
+
+  fix_tsdf_materials:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.blenderproc
+    volumes:
+      - ./models:/workspace/models
+      - ./scripts:/workspace/scripts:ro
+    command: ["python3", "/workspace/scripts/fix_tsdf_materials.py", "--ycb-dir", "/workspace/models/ycb"]
+    stdin_open: true
+    tty: true
