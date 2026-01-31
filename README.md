@@ -20,7 +20,8 @@ ycb_synthforge/
 │   └── Dockerfile.yolo26         # YOLO26学習環境
 ├── docker-compose.yml
 ├── models/
-│   └── ycb/                      # YCB 3Dモデル (85クラス, google_16k/tsdf形式)
+│   ├── ycb/                      # YCB 3Dモデル (85クラス, google_16k/tsdf形式)
+│   └── tidbots/                  # カスタム3Dモデル (独自オブジェクト用)
 ├── resources/
 │   └── cctextures/               # CC0テクスチャ (2022枚)
 ├── weights/
@@ -419,6 +420,149 @@ Sim-to-Realギャップを軽減するため、以下の要素をランダム化
 | Val | 2,500 | 8.3% | ハイパーパラメータ調整 |
 | Test | 2,500 | 8.3% | 最終評価 |
 
+## カスタムモデルソースの追加
+
+YCB以外の独自3Dモデルを追加して学習データに含めることができます。
+
+### ディレクトリ構造
+
+```
+models/
+├── ycb/                          # YCBオブジェクト (クラスID: 0-102)
+│   └── 002_master_chef_can/
+│       └── google_16k/
+│           └── textured.obj
+└── tidbots/                      # カスタムオブジェクト (クラスID: 103-)
+    ├── my_bottle/
+    │   └── google_16k/
+    │       ├── textured.obj
+    │       └── textured.png
+    └── my_gripper/
+        └── google_16k/
+            ├── textured.obj
+            └── textured.png
+```
+
+### 設定ファイル
+
+`scripts/blenderproc/config.yaml` でモデルソースを設定:
+
+```yaml
+model_sources:
+  # YCBモデル
+  ycb:
+    path: "/workspace/models/ycb"
+    include:                      # 特定オブジェクトのみ使用
+      - "002_master_chef_can"
+      - "005_tomato_soup_can"
+      - "006_mustard_bottle"
+
+  # カスタムモデル
+  tidbots:
+    path: "/workspace/models/tidbots"
+    include: []                   # 空=全オブジェクト使用
+```
+
+### クラスIDの割り当て
+
+| ソース | クラスID範囲 | 説明 |
+|--------|-------------|------|
+| ycb | 0-102 | 既存のYCB IDを維持 |
+| tidbots | 103- | 自動で連番割り当て |
+| (追加ソース) | 続きから連番 | ソース順に割り当て |
+
+### 対応モデル形式
+
+以下の形式を自動検出（優先順）:
+
+1. `object_name/google_16k/textured.obj` (YCB形式)
+2. `object_name/tsdf/textured.obj`
+3. `object_name/textured.obj` (シンプル形式)
+4. `object_name/*.obj` (任意のOBJ)
+
+### 3Dモデルの変換
+
+ダウンロードした3DモデルをOBJ形式に変換するスクリプトを用意しています。
+
+**Blender形式 (.blend) → OBJ:**
+```bash
+docker compose run --rm -v /tmp/mymodel:/tmp/mymodel blenderproc \
+  blenderproc run /workspace/scripts/convert_blend_to_obj.py \
+  /tmp/mymodel/model.blend \
+  /tmp/mymodel/output \
+  /tmp/mymodel/textures  # テクスチャディレクトリ（オプション）
+```
+
+**COLLADA形式 (.dae) → OBJ:**
+```bash
+docker compose run --rm -v /tmp/mymodel:/tmp/mymodel blenderproc \
+  blenderproc run /workspace/scripts/convert_dae_to_obj.py \
+  /tmp/mymodel/model.dae \
+  /tmp/mymodel/output
+```
+
+**FBX形式 (.fbx) → OBJ:**
+```bash
+docker compose run --rm -v /tmp/mymodel:/tmp/mymodel blenderproc \
+  blenderproc run /workspace/scripts/convert_fbx_to_obj.py \
+  /tmp/mymodel/model.fbx \
+  /tmp/mymodel/output
+```
+
+変換後、出力ファイルをmodelsディレクトリにコピー:
+```bash
+mkdir -p models/tidbots/my_object/google_16k
+cp /tmp/mymodel/output/* models/tidbots/my_object/google_16k/
+```
+
+### カスタムモデルのみで学習
+
+YCBを使わず、独自モデルのみで学習する場合:
+
+```yaml
+# scripts/blenderproc/config.yaml
+model_sources:
+  # YCB disabled
+  # ycb:
+  #   path: "/workspace/models/ycb"
+  #   include: []
+
+  # カスタムモデルのみ使用
+  tidbots:
+    path: "/workspace/models/tidbots"
+    include: []  # 空=全オブジェクト使用
+
+scene:
+  num_images: 2000          # 少数クラスなら2000枚程度で十分
+  objects_per_scene: [1, 5]  # クラス数に合わせて調整
+```
+
+**推奨データ量の目安:**
+| クラス数 | 推奨枚数 | 1クラスあたり |
+|---------|---------|--------------|
+| 5 | 2,000 | 400枚 |
+| 10 | 3,000 | 300枚 |
+| 20 | 5,000 | 250枚 |
+| 50+ | 10,000+ | 200枚+ |
+
+### 特定オブジェクトのみ使用
+
+全オブジェクトではなく、特定のオブジェクトのみを使用する場合:
+
+```yaml
+model_sources:
+  ycb:
+    path: "/workspace/models/ycb"
+    include:
+      - "002_master_chef_can"     # 缶
+      - "003_cracker_box"         # 箱
+      - "006_mustard_bottle"      # ボトル
+      - "024_bowl"                # 食器
+      - "025_mug"                 # マグカップ
+```
+
+これにより、学習対象を絞り込んで効率的にモデルを作成できます。
+
 ## YCBオブジェクトクラス (85種)
 
 <details>
@@ -472,9 +616,22 @@ Sim-to-Realギャップを軽減するため、以下の要素をランダム化
 ### データ生成設定 (`scripts/blenderproc/config.yaml`)
 
 ```yaml
+# モデルソース設定（複数ソース対応）
+model_sources:
+  ycb:
+    path: "/workspace/models/ycb"
+    include: []                   # 空=全オブジェクト使用
+    # include:                    # 特定オブジェクトのみ使用する場合
+    #   - "002_master_chef_can"
+    #   - "005_tomato_soup_can"
+
+  tidbots:                        # カスタムモデルソース
+    path: "/workspace/models/tidbots"
+    include: []
+
 scene:
   num_images: 30000
-  objects_per_scene: [2, 8]    # シーンあたりのYCBオブジェクト数
+  objects_per_scene: [2, 8]    # シーンあたりのオブジェクト数
 
 rendering:
   engine: "CYCLES"

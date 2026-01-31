@@ -26,7 +26,7 @@ from camera import CameraRandomizer
 from lighting import LightingRandomizer
 from materials import MaterialRandomizer
 from scene_setup import SceneSetup
-from ycb_classes import NUM_CLASSES, YCB_CLASSES, YCB_NAME_TO_ID, get_material_type
+from ycb_classes import YCB_CLASSES, YCB_NAME_TO_ID, get_material_type
 
 # Configure logging
 logging.basicConfig(
@@ -79,66 +79,207 @@ USE_TSDF_FORMAT = {
 }
 
 
-def get_ycb_model_paths(ycb_dir: str) -> Dict[str, str]:
-    """
-    Get paths to all YCB model OBJ files.
+class ModelSourceManager:
+    """Manages multiple model sources and class ID assignments."""
 
-    Prioritizes google_16k format for most objects, but uses tsdf format
-    for objects with known mesh issues in google_16k.
+    def __init__(self):
+        self.model_paths: Dict[str, str] = {}  # object_name -> file_path
+        self.class_mapping: Dict[str, int] = {}  # object_name -> class_id
+        self.id_to_name: Dict[int, str] = {}  # class_id -> object_name
+        self.source_info: Dict[str, str] = {}  # object_name -> source_name
+        self._next_class_id = 0
 
-    Args:
-        ycb_dir: Path to YCB models directory
+    def load_source(
+        self,
+        source_name: str,
+        source_path: str,
+        include_objects: Optional[List[str]] = None,
+        use_ycb_classes: bool = False,
+    ) -> int:
+        """
+        Load models from a source directory.
 
-    Returns:
-        Dictionary mapping object name to OBJ file path
-    """
-    model_paths = {}
-    ycb_path = Path(ycb_dir)
+        Args:
+            source_name: Name of the source (e.g., "ycb", "tidbots")
+            source_path: Path to the source directory
+            include_objects: Optional list of objects to include
+            use_ycb_classes: If True, use predefined YCB class IDs
 
-    for obj_name in YCB_CLASSES.values():
-        # Skip excluded objects
-        if obj_name in EXCLUDED_OBJECTS:
-            logger.info(f"Excluding {obj_name}: poor mesh quality")
-            continue
+        Returns:
+            Number of models loaded from this source
+        """
+        source_dir = Path(source_path)
+        if not source_dir.exists():
+            logger.warning(f"Source directory not found: {source_path}")
+            return 0
 
-        google_path = ycb_path / obj_name / "google_16k" / "textured.obj"
-        tsdf_path = ycb_path / obj_name / "tsdf" / "textured.obj"
+        # Get available objects in this source
+        available_objects = []
+        for obj_dir in sorted(source_dir.iterdir()):
+            if obj_dir.is_dir() and not obj_dir.name.startswith('.'):
+                available_objects.append(obj_dir.name)
+
+        # Filter by include list if specified
+        if include_objects:
+            target_objects = [o for o in include_objects if o in available_objects]
+            if len(target_objects) < len(include_objects):
+                missing = set(include_objects) - set(available_objects)
+                logger.warning(f"Objects not found in {source_name}: {missing}")
+        else:
+            target_objects = available_objects
+
+        loaded_count = 0
+        for obj_name in target_objects:
+            # Skip excluded objects
+            if obj_name in EXCLUDED_OBJECTS:
+                logger.info(f"Excluding {obj_name}: poor mesh quality")
+                continue
+
+            # Find model file
+            model_file = self._find_model_file(source_dir / obj_name)
+            if model_file is None:
+                logger.warning(f"No model file found for {obj_name}")
+                continue
+
+            # Assign class ID
+            if use_ycb_classes and obj_name in YCB_NAME_TO_ID:
+                class_id = YCB_NAME_TO_ID[obj_name]
+                # Update next_class_id to avoid conflicts
+                self._next_class_id = max(self._next_class_id, class_id + 1)
+            else:
+                class_id = self._next_class_id
+                self._next_class_id += 1
+
+            # Register the model
+            self.model_paths[obj_name] = str(model_file)
+            self.class_mapping[obj_name] = class_id
+            self.id_to_name[class_id] = obj_name
+            self.source_info[obj_name] = source_name
+            loaded_count += 1
+
+            logger.debug(f"Loaded {obj_name} (class_id={class_id}) from {source_name}")
+
+        logger.info(f"Loaded {loaded_count} models from {source_name}")
+        return loaded_count
+
+    def _find_model_file(self, obj_dir: Path) -> Optional[str]:
+        """Find the best model file for an object."""
+        obj_name = obj_dir.name
+
+        # Check for YCB-style subdirectories
+        google_path = obj_dir / "google_16k" / "textured.obj"
+        tsdf_path = obj_dir / "tsdf" / "textured.obj"
 
         # For objects where tsdf is preferred
         if obj_name in USE_TSDF_FORMAT:
             if tsdf_path.exists():
-                model_paths[obj_name] = str(tsdf_path)
-                logger.info(f"Using tsdf format for {obj_name} (preferred)")
+                logger.debug(f"Using tsdf format for {obj_name}")
+                return str(tsdf_path)
             elif google_path.exists():
-                model_paths[obj_name] = str(google_path)
-                logger.warning(f"Using google_16k for {obj_name} (tsdf not available)")
-            else:
-                logger.warning(f"Skipping {obj_name}: no suitable format available")
-        else:
-            # For normal objects, prefer google_16k, fallback to tsdf
-            if google_path.exists():
-                model_paths[obj_name] = str(google_path)
-            elif tsdf_path.exists():
-                model_paths[obj_name] = str(tsdf_path)
-                logger.info(f"Using tsdf format for {obj_name} (google_16k not available)")
-            else:
-                logger.warning(f"Skipping {obj_name}: no suitable format available")
+                return str(google_path)
 
-    logger.info(f"Found {len(model_paths)} YCB models")
-    return model_paths
+        # Prefer google_16k, fallback to tsdf
+        if google_path.exists():
+            return str(google_path)
+        elif tsdf_path.exists():
+            logger.debug(f"Using tsdf format for {obj_name}")
+            return str(tsdf_path)
+
+        # Check for direct OBJ file
+        direct_obj = obj_dir / "textured.obj"
+        if direct_obj.exists():
+            return str(direct_obj)
+
+        # Check for any OBJ file
+        obj_files = list(obj_dir.glob("*.obj"))
+        if obj_files:
+            return str(obj_files[0])
+
+        return None
+
+    def get_class_id(self, obj_name: str) -> int:
+        """Get class ID for an object name."""
+        return self.class_mapping.get(obj_name, -1)
+
+    def get_class_name(self, class_id: int) -> str:
+        """Get object name for a class ID."""
+        return self.id_to_name.get(class_id, "unknown")
+
+    @property
+    def num_classes(self) -> int:
+        """Get total number of classes."""
+        return len(self.class_mapping)
+
+    def get_categories_for_coco(self) -> List[Dict]:
+        """Get category list for COCO format annotations."""
+        return [
+            {
+                "id": class_id,
+                "name": obj_name,
+                "supercategory": self.source_info.get(obj_name, "object"),
+            }
+            for obj_name, class_id in sorted(
+                self.class_mapping.items(), key=lambda x: x[1]
+            )
+        ]
 
 
-def load_ycb_objects(
-    model_paths: Dict[str, str],
+def load_model_sources(config: Dict[str, Any]) -> ModelSourceManager:
+    """
+    Load all model sources from configuration.
+
+    Args:
+        config: Configuration dictionary
+
+    Returns:
+        ModelSourceManager with all models loaded
+    """
+    manager = ModelSourceManager()
+
+    model_sources = config.get("model_sources", {})
+
+    if not model_sources:
+        # Fallback to legacy config format
+        ycb_path = config.get("paths", {}).get("ycb_models")
+        include_objects = config.get("objects", {}).get("include", [])
+        if ycb_path:
+            manager.load_source(
+                "ycb",
+                ycb_path,
+                include_objects if include_objects else None,
+                use_ycb_classes=True,
+            )
+        return manager
+
+    # Load each configured source
+    for source_name, source_config in model_sources.items():
+        source_path = source_config.get("path", "")
+        include_objects = source_config.get("include", [])
+
+        # YCB source uses predefined class IDs for compatibility
+        use_ycb_classes = source_name.lower() == "ycb"
+
+        manager.load_source(
+            source_name,
+            source_path,
+            include_objects if include_objects else None,
+            use_ycb_classes=use_ycb_classes,
+        )
+
+    return manager
+
+
+def load_objects(
+    model_manager: ModelSourceManager,
     selected_objects: List[str],
     material_randomizer: MaterialRandomizer,
     use_physics: bool = False,
 ) -> List[bproc.types.MeshObject]:
     """
-    Load and prepare YCB objects for the scene.
+    Load and prepare objects for the scene.
 
     Args:
-        model_paths: Dictionary of object names to file paths
+        model_manager: ModelSourceManager instance
         selected_objects: List of object names to load
         material_randomizer: Material randomizer instance
         use_physics: Whether to enable physics simulation
@@ -149,20 +290,20 @@ def load_ycb_objects(
     loaded_objects = []
 
     for obj_name in selected_objects:
-        if obj_name not in model_paths:
+        if obj_name not in model_manager.model_paths:
             logger.warning(f"Skipping {obj_name}: model path not found")
             continue
 
         try:
             # Load the object
-            objs = bproc.loader.load_obj(model_paths[obj_name])
+            objs = bproc.loader.load_obj(model_manager.model_paths[obj_name])
 
             for obj in objs:
                 # Set object name for identification
                 obj.set_name(obj_name)
 
                 # Set custom property for class ID
-                class_id = YCB_NAME_TO_ID[obj_name]
+                class_id = model_manager.get_class_id(obj_name)
                 obj.set_cp("category_id", class_id)
                 obj.set_cp("class_name", obj_name)
 
@@ -190,7 +331,7 @@ def load_ycb_objects(
 
 def generate_scene(
     config: Dict[str, Any],
-    model_paths: Dict[str, str],
+    model_manager: ModelSourceManager,
     scene_setup: SceneSetup,
     lighting_randomizer: LightingRandomizer,
     camera_randomizer: CameraRandomizer,
@@ -202,7 +343,7 @@ def generate_scene(
 
     Args:
         config: Configuration dictionary
-        model_paths: Dictionary of YCB model paths
+        model_manager: ModelSourceManager instance
         scene_setup: Scene setup instance
         lighting_randomizer: Lighting randomizer instance
         camera_randomizer: Camera randomizer instance
@@ -224,20 +365,20 @@ def generate_scene(
         placement_config = config.get("placement", {})
         use_physics = placement_config.get("use_physics", False)
 
-        # Randomly select YCB objects for this scene
+        # Randomly select objects for this scene
         num_objects = random.randint(
             config["scene"]["objects_per_scene"][0],
             config["scene"]["objects_per_scene"][1],
         )
-        available_objects = list(model_paths.keys())
+        available_objects = list(model_manager.model_paths.keys())
         selected_objects = random.sample(
             available_objects,
             min(num_objects, len(available_objects)),
         )
 
-        # Load YCB objects
-        ycb_objects = load_ycb_objects(
-            model_paths,
+        # Load objects
+        ycb_objects = load_objects(
+            model_manager,
             selected_objects,
             material_randomizer,
             use_physics=use_physics,
@@ -363,6 +504,7 @@ def save_coco_annotations(
     output_dir: str,
     all_annotations: List[Dict],
     all_images: List[Dict],
+    model_manager: ModelSourceManager,
 ) -> None:
     """
     Save annotations in COCO format.
@@ -371,16 +513,14 @@ def save_coco_annotations(
         output_dir: Output directory path
         all_annotations: List of annotation dictionaries
         all_images: List of image metadata dictionaries
+        model_manager: ModelSourceManager instance for category info
     """
-    # Build category list
-    categories = [
-        {"id": class_id, "name": class_name, "supercategory": "ycb_object"}
-        for class_id, class_name in YCB_CLASSES.items()
-    ]
+    # Build category list from model manager
+    categories = model_manager.get_categories_for_coco()
 
     coco_format = {
         "info": {
-            "description": "YCB Object Synthetic Dataset",
+            "description": "Synthetic Object Dataset",
             "version": "1.0",
             "year": 2026,
             "contributor": "BlenderProc",
@@ -449,13 +589,14 @@ def main():
     images_dir = output_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
 
-    # Get YCB model paths
-    ycb_dir = config["paths"]["ycb_models"]
-    model_paths = get_ycb_model_paths(ycb_dir)
+    # Load model sources
+    model_manager = load_model_sources(config)
 
-    if not model_paths:
-        logger.error("No YCB models found. Exiting.")
+    if model_manager.num_classes == 0:
+        logger.error("No models found. Exiting.")
         sys.exit(1)
+
+    logger.info(f"Total classes: {model_manager.num_classes}")
 
     # Initialize randomizers
     textures_dir = config["paths"]["textures"]
@@ -485,7 +626,7 @@ def main():
 
         result = generate_scene(
             config,
-            model_paths,
+            model_manager,
             scene_setup,
             lighting_randomizer,
             camera_randomizer,
@@ -576,7 +717,7 @@ def main():
                     if obj_name in obj_name_to_category:
                         category_id = obj_name_to_category[obj_name]
 
-            if category_id < 0 or category_id >= NUM_CLASSES:
+            if category_id < 0 or category_id not in model_manager.id_to_name:
                 continue
 
             # Calculate bounding box
@@ -617,7 +758,7 @@ def main():
             logger.info(f"Progress: {scene_idx + 1}/{args.start_idx + num_scenes} scenes completed")
 
     # Save COCO annotations
-    save_coco_annotations(str(output_dir), all_annotations, all_images)
+    save_coco_annotations(str(output_dir), all_annotations, all_images, model_manager)
 
     logger.info("Dataset generation complete!")
     logger.info(f"Generated {len(all_images)} images with {len(all_annotations)} annotations")

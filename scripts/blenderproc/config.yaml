@@ -1,6 +1,21 @@
 # BlenderProc Data Generation Configuration
 # YCB Object Detection with Domain Randomization
 
+# Model sources configuration
+# Multiple model directories can be specified
+# Each source has its own path and include list
+# Class IDs are assigned automatically: first source starts at 0
+model_sources:
+  # YCB disabled - using tidbots only
+  # ycb:
+  #   path: "/workspace/models/ycb"
+  #   include: []
+
+  # Custom model source (tidbots only)
+  tidbots:
+    path: "/workspace/models/tidbots"
+    include: []  # 5 classes: apple, coke_zero, french_coke_can, mustard_bottle_sample, pepsi_can
+
 # Output settings
 output:
   base_dir: "/workspace/data/synthetic/coco"
@@ -9,8 +24,8 @@ output:
 
 # Scene settings
 scene:
-  num_images: 30000  # Total images to generate (25k train, 2.5k val, 2.5k test)
-  objects_per_scene: [2, 8]  # Min-max YCB objects per scene
+  num_images: 2000  # Total images to generate
+  objects_per_scene: [1, 5]  # Min-max objects per scene (5 classes available)
   clutter_per_scene: [3, 15]  # Min-max clutter objects
 
 # Camera settings
