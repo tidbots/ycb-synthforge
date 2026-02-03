@@ -64,6 +64,17 @@
 | Avg Inference Time | 5-7ms/image |
 | Confidence Threshold | 0.5 |
 
+### Detection Result Samples
+
+![Detection Result 1 - cupnoodle_seafood, coffee_1, redbull](images/scene_000054.jpg)
+*Detection example: cupnoodle_seafood (92%), coffee_1 (99%), redbull (96%)*
+
+![Detection Result 2 - aquarius, coffee_1, cupnoodle_seafood](images/scene_000114.jpg)
+*Detection example: aquarius (97%), coffee_1 (98%), cupnoodle_seafood (97%)*
+
+![Detection Result 3 - aquarius, chipstar](images/scene_000088.jpg)
+*Detection example: aquarius, chipstar*
+
 ### Per-Class Detection Confidence (Samples)
 
 | Class | Confidence |

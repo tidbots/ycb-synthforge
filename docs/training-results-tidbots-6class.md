@@ -64,6 +64,17 @@
 | 平均推論時間 | 5-7ms/画像 |
 | 信頼度閾値 | 0.5 |
 
+### 検出結果サンプル
+
+![検出結果1 - cupnoodle_seafood, coffee_1, redbull](images/scene_000054.jpg)
+*cupnoodle_seafood (92%), coffee_1 (99%), redbull (96%) の検出例*
+
+![検出結果2 - aquarius, coffee_1, cupnoodle_seafood](images/scene_000114.jpg)
+*aquarius (97%), coffee_1 (98%), cupnoodle_seafood (97%) の検出例*
+
+![検出結果3 - aquarius, chipstar](images/scene_000088.jpg)
+*aquarius, chipstar の検出例*
+
 ### クラス別検出信頼度（サンプル）
 
 | クラス | 信頼度 |
