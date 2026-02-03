@@ -38,10 +38,10 @@ docker logs --tail 30 <container_id>
 
 ### 生成画像サンプル
 
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000009.png)
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000013.png)
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000029.png)
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000455.png)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/scene_000009.png)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/scene_000013.png)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/scene_000029.png)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/scene_000455.png)
 
 ## 2. COCO→YOLO形式変換
 
@@ -143,9 +143,9 @@ docker compose run --rm \
 
 ### 認識結果のサンプル
 
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/inference_sample1.jpg)
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/inference_sample2.jpg)
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/inference_sample3.jpg)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/inference_sample1.jpg)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/inference_sample2.jpg)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/inference_sample3.jpg)
 
 ## 6. リアルタイム検出 (Webカメラ)
 

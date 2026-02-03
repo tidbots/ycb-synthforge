@@ -72,7 +72,7 @@ docker run --rm \
     -v $(pwd)/scripts:/workspace/scripts:ro \
     --device /dev/video$CAMERA_ID:/dev/video0 \
     --shm-size=8gb \
-    ycb_synthforge-yolo26_inference \
+    ycb-synthforge-yolo26_inference \
     python3 /workspace/scripts/evaluation/realtime_detection.py \
     --model /workspace/$MODEL_PATH \
     --camera 0 \

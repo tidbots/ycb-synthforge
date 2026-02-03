@@ -64,21 +64,21 @@ docker compose run --rm yolo26_inference python3 \
 
 ## 生成画像サンプル
 
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000009.png)
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000013.png)
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000029.png)
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/scene_000455.png)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/scene_000009.png)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/scene_000013.png)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/scene_000029.png)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/scene_000455.png)
 
 ## 認識結果のサンプル
 
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/inference_sample1.jpg)
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/inference_sample2.jpg)
-![](https://github.com/tidbots/ycb_synthforge/blob/main/fig/inference_sample3.jpg)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/inference_sample1.jpg)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/inference_sample2.jpg)
+![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/inference_sample3.jpg)
 
 ## プロジェクト構成
 
 ```
-ycb_synthforge/
+ycb-synthforge/
 ├── docker/                       # Dockerファイル
 ├── docker-compose.yml
 ├── models/
