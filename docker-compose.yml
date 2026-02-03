@@ -1,3 +1,5 @@
+version: '2.3'
+
 services:
   blenderproc:
     build:
@@ -26,13 +28,7 @@ services:
       - ./runs:/workspace/runs
     environment:
       - CUDA_VISIBLE_DEVICES=0
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      - NVIDIA_VISIBLE_DEVICES=all
     shm_size: '16gb'
     stdin_open: true
     tty: true
@@ -48,13 +44,7 @@ services:
       - ./scripts:/workspace/scripts:ro
     environment:
       - CUDA_VISIBLE_DEVICES=0
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      - NVIDIA_VISIBLE_DEVICES=all
     shm_size: '8gb'
     stdin_open: true
     tty: true
@@ -119,13 +109,7 @@ services:
       - ./data:/workspace/data:ro
     environment:
       - CUDA_VISIBLE_DEVICES=0
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      - NVIDIA_VISIBLE_DEVICES=all
     shm_size: '8gb'
     stdin_open: true
     tty: true

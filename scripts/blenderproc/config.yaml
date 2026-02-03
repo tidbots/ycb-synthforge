@@ -25,7 +25,7 @@ output:
 # Scene settings
 scene:
   num_images: 2000  # Total images to generate
-  objects_per_scene: [1, 5]  # Min-max objects per scene (5 classes available)
+  objects_per_scene: [1, 3]  # Min-max objects per scene (reduced to avoid overlap)
   clutter_per_scene: [3, 15]  # Min-max clutter objects
 
 # Camera settings
@@ -115,10 +115,10 @@ materials:
 
 # Object placement
 placement:
-  # Position randomization - grid-based spacing
+  # Position randomization - wider grid-based spacing to avoid overlap
   position:
-    x_range: [-0.25, 0.25]
-    y_range: [-0.25, 0.25]
+    x_range: [-0.35, 0.35]
+    y_range: [-0.35, 0.35]
     z_range: [0, 0.2]
   # Rotation randomization
   rotation:
@@ -127,7 +127,7 @@ placement:
     z: [0, 360]
   # Scale variation (manufacturing tolerance)
   scale_variation: [-0.05, 0.05]  # ±5%
-  # Physics simulation - disabled, using grid-based placement instead
+  # Physics simulation - disabled, using wider grid spacing instead
   use_physics: false
   physics_steps: 100
 
