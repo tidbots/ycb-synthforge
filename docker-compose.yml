@@ -32,6 +32,13 @@ services:
     shm_size: '16gb'
     stdin_open: true
     tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   yolo26_inference:
     build:
@@ -48,6 +55,13 @@ services:
     shm_size: '8gb'
     stdin_open: true
     tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   mesh_validator:
     build:

@@ -269,6 +269,39 @@ def load_model_sources(config: Dict[str, Any]) -> ModelSourceManager:
     return manager
 
 
+def normalize_object_scale(obj: bproc.types.MeshObject, target_size: float = 0.15) -> None:
+    """
+    Normalize object scale so that its largest dimension equals target_size.
+    This handles models in different units (mm vs m).
+
+    Args:
+        obj: The mesh object to normalize
+        target_size: Target size for the largest dimension in meters
+    """
+    # Get bounding box
+    bbox = obj.get_bound_box()
+    bbox_array = np.array(bbox)
+
+    # Calculate dimensions
+    min_coords = bbox_array.min(axis=0)
+    max_coords = bbox_array.max(axis=0)
+    dimensions = max_coords - min_coords
+
+    # Get largest dimension
+    max_dim = max(dimensions)
+
+    if max_dim > 0:
+        # Calculate scale factor
+        scale_factor = target_size / max_dim
+
+        # Apply scale
+        current_scale = obj.get_scale()
+        new_scale = [s * scale_factor for s in current_scale]
+        obj.set_scale(new_scale)
+
+        logger.debug(f"Normalized {obj.get_name()}: max_dim={max_dim:.3f}m -> {target_size}m (scale={scale_factor:.4f})")
+
+
 def load_objects(
     model_manager: ModelSourceManager,
     selected_objects: List[str],
@@ -306,6 +339,10 @@ def load_objects(
                 class_id = model_manager.get_class_id(obj_name)
                 obj.set_cp("category_id", class_id)
                 obj.set_cp("class_name", obj_name)
+
+                # Normalize object scale (handles mm vs m unit differences)
+                # Target size ~15cm for typical product objects
+                normalize_object_scale(obj, target_size=0.15)
 
                 # Skip material randomization to preserve original textures
                 # TODO: Fix material randomization to not break textures
@@ -424,11 +461,11 @@ def generate_scene(
             rz = np.radians(random.uniform(0, 360))
             obj.set_rotation_euler([rx, ry, rz])
 
-            # Scale up objects to be more visible
+            # Apply scale variation while preserving normalized scale
             scale_var = placement_config.get("scale_variation", [-0.05, 0.05])
-            base_scale = 1.5  # Scale up by 50%
-            scale = base_scale * (1.0 + random.uniform(scale_var[0], scale_var[1]))
-            obj.set_scale([scale, scale, scale])
+            variation = 1.0 + random.uniform(scale_var[0], scale_var[1])
+            current_scale = obj.get_scale()
+            obj.set_scale([s * variation for s in current_scale])
 
         # Run physics simulation to settle objects
         if use_physics:

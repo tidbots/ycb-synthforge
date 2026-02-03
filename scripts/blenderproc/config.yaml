@@ -14,7 +14,7 @@ model_sources:
   # Custom model source (tidbots only)
   tidbots:
     path: "/workspace/models/tidbots"
-    include: []  # 5 classes: apple, coke_zero, french_coke_can, mustard_bottle_sample, pepsi_can
+    include: []  # 6 classes: aquarius, chipstar, coffee_1, coffee_2, cupnoodle_seafood, redbull
 
 # Output settings
 output:
