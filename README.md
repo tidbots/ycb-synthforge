@@ -62,6 +62,24 @@ docker compose run --rm yolo26_inference python3 \
   --source /workspace/yolo_dataset/images/val
 ```
 
+### 5. リアルタイム検出（Webカメラ）
+
+```bash
+python scripts/evaluation/realtime_detection.py \
+  --model outputs/trained_models/ycb_yolo26_run/weights/best.pt \
+  --camera 0 \
+  --conf 0.5
+```
+
+安定化機能付きのリアルタイム検出:
+- ByteTrackトラッキング
+- 信頼度・座標の平滑化
+- クラス予測の固定
+- ヒステリシスによるチラつき防止
+- 軌跡・速度表示
+
+詳細は[リアルタイム検出ガイド](docs/realtime-detection.md)を参照。
+
 ## 生成画像サンプル
 
 ![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/scene_000009.png)
@@ -108,6 +126,7 @@ ycb-synthforge/
 | [YCBクラス一覧](docs/ycb-classes.md) | 85種類のYCBオブジェクト |
 | [追加学習](docs/incremental-learning.md) | 新しいオブジェクトの追加 |
 | [アンサンブル推論](docs/ensemble-inference.md) | 複数モデルの組み合わせ |
+| [リアルタイム検出](docs/realtime-detection.md) | Webカメラによるリアルタイム物体検出 |
 | [トラブルシューティング](docs/troubleshooting.md) | 問題解決 |
 
 ## 必要環境

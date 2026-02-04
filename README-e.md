@@ -62,6 +62,24 @@ docker compose run --rm yolo26_inference python3 \
   --source /workspace/yolo_dataset/images/val
 ```
 
+### 5. Real-time Detection (Webcam)
+
+```bash
+python scripts/evaluation/realtime_detection.py \
+  --model outputs/trained_models/ycb_yolo26_run/weights/best.pt \
+  --camera 0 \
+  --conf 0.5
+```
+
+Stabilized real-time detection features:
+- ByteTrack tracking
+- Confidence & coordinate smoothing
+- Class prediction stabilization
+- Hysteresis to prevent flickering
+- Trajectory & velocity display
+
+See [Real-time Detection Guide](docs/realtime-detection-e.md) for details.
+
 ## Sample Generated Images
 
 ![](https://github.com/tidbots/ycb-synthforge/blob/main/fig/scene_000009.png)
@@ -108,6 +126,7 @@ ycb-synthforge/
 | [YCB Classes](docs/ycb-classes-e.md) | 85 types of YCB objects |
 | [Incremental Learning](docs/incremental-learning-e.md) | Adding new objects |
 | [Ensemble Inference](docs/ensemble-inference-e.md) | Combining multiple models |
+| [Real-time Detection](docs/realtime-detection-e.md) | Real-time object detection with webcam |
 | [Troubleshooting](docs/troubleshooting-e.md) | Problem solving |
 
 ## Requirements
