@@ -8,8 +8,12 @@ This document describes how to use real-time object detection and tracking with 
 
 - **Object tracking with ByteTrack** - Reduces detection flickering
 - **Moving average coordinates** - Smoothed over 1 second of history
+- **Confidence smoothing** - Exponential moving average suppresses sudden score changes
+- **Class prediction stabilization** - Majority voting fixes class for same track ID
+- **Hysteresis** - Appearance/disappearance thresholds prevent flickering
 - **Trajectory visualization** - Shows movement path over the past 1 second
 - **Velocity display** - Shows movement speed in px/sec
+- **Variable frame rate** - Target 30Hz, dynamically adjustable
 
 ## Basic Usage
 
@@ -32,6 +36,7 @@ python scripts/evaluation/realtime_detection.py \
 | `--device` | `0` | GPU device |
 | `--save-video` | `False` | Enable video recording |
 | `--output` | `outputs/realtime_detection.mp4` | Output video path |
+| `--target-fps` | `30.0` | Target frame rate (Hz) |
 
 ## Keyboard Controls
 
@@ -43,22 +48,53 @@ python scripts/evaluation/realtime_detection.py \
 | `p` | Toggle coordinate display |
 | `t` | Toggle trajectory display |
 | `v` | Toggle velocity display |
+| `+` / `=` | Increase target FPS by 5 (max 60) |
+| `-` | Decrease target FPS by 5 (min 5) |
+
+## Stabilization Features
+
+### 1. Confidence Smoothing
+
+Uses Exponential Moving Average (EMA) to suppress sudden score fluctuations.
+
+```
+smoothed_conf = α × current_conf + (1 - α) × previous_smoothed_conf
+α = 0.3 (default)
+```
+
+### 2. Class Prediction Stabilization
+
+For each track ID, the class is fixed by majority vote over the first 5 frames.
+This prevents flickering between similar object classes.
+
+### 3. Hysteresis
+
+- **Appearance threshold**: Display starts after 3 consecutive frames detected
+- **Disappearance threshold**: Display ends after 5 consecutive frames missing
+
+This prevents flickering from momentary false detections or detection failures.
+
+### 4. Variable Frame Rate
+
+- Default 30Hz
+- Dynamically adjustable with `+`/`-` keys (5-60Hz)
+- Adapts to GPU load
 
 ## Screen Display
 
 ```
 +------------------------------------------+
-| FPS: 30.0 | Detections: 2                |
+| FPS: 28.5/30 | Visible: 2                |
 |                                          |
 |   +---------------+                      |
 |   | cracker_box   |                      |
-|   |    0.85       |                      |
+|   |    0.85       |  <- Smoothed confidence
 |   +----~~~~-------+  <- Trajectory (yellow)
 |   ID:1 (230,250)     <- Smoothed coords (cyan)
 |   45 px/s            <- Velocity (green) |
 |                                          |
 |          +--------+                      |
-|          | banana |                      |
+|          | banana |  <- Fixed class      |
 |          |  0.72  |                      |
 |          +--------+                      |
 |          ID:2 (450,280)                  |
@@ -70,27 +106,20 @@ python scripts/evaluation/realtime_detection.py \
 
 | Element | Color | Description |
 |---------|-------|-------------|
-| Bounding box | Class-dependent | Default YOLO annotation |
+| Bounding box | Track ID dependent | Unique color per track |
 | Trajectory | Yellow `(0,255,255)` | Movement path of center point over past 1 second |
 | Coordinates | Cyan `(255,255,0)` | Center coordinates smoothed by moving average |
 | Velocity | Green `(0,255,0)` | Speed in px/sec calculated from 1-second movement |
 
-## Tracking Features
+## Stabilization Parameters
 
-### ByteTrack
+The following parameters can be adjusted in the source code:
 
-This script uses the ByteTrack algorithm for object tracking.
-
-- Assigns consistent IDs to the same object
-- Handles temporary detection failures
-- Uses `persist=True` to maintain state across frames
-
-### Moving Average Smoothing
-
-To reduce coordinate flickering, the system maintains 1 second (~30 frames) of history and calculates the moving average.
-
-```
-Smoothed coordinates = mean(center coordinates over past 1 second)
+```python
+APPEAR_THRESHOLD = 3      # Consecutive frames required to appear
+DISAPPEAR_THRESHOLD = 5   # Consecutive frames required to disappear
+CONF_SMOOTHING_ALPHA = 0.3  # EMA alpha (lower = smoother)
+CLASS_VOTE_FRAMES = 5     # Frames used for class voting
 ```
 
 ## Usage Examples
@@ -106,13 +135,13 @@ python scripts/evaluation/realtime_detection.py \
   --output outputs/detection_demo.mp4
 ```
 
-### High Resolution (may impact performance)
+### High Frame Rate
 
 ```bash
 python scripts/evaluation/realtime_detection.py \
   --model outputs/trained_models/tidbots_6class/weights/best.pt \
   --camera 0 \
-  --imgsz 1280 \
+  --target-fps 60 \
   --conf 0.5
 ```
 
@@ -138,16 +167,22 @@ Error: Cannot open camera 0
 - Ensure no other application is using the camera
 - Try a different camera ID: `--camera 1`
 
-### Low FPS
+### FPS doesn't reach target
 
 - Reduce `--imgsz` (e.g., 320, 416)
 - Increase `--conf` to reduce detection count
 - Verify GPU usage: `--device 0`
+- Lower `--target-fps`
 
 ### Tracking IDs change frequently
 
 - Lower `--conf` to stabilize detections
 - Adjust `--iou` threshold
+- Increase hysteresis thresholds (in source code)
+
+### Objects appear slowly
+
+Reduce `APPEAR_THRESHOLD` (default: 3)
 
 ## Related Documentation
 
