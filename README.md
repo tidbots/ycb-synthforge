@@ -17,7 +17,7 @@ YCB SynthForgeは、85種類のYCBオブジェクトを検出するためのEnd-
 
 ```bash
 # Dockerイメージをビルド
-docker compose build
+docker compose build blenderproc yolo26_train
 
 # YOLO26重みをダウンロード
 python scripts/download_weights.py

@@ -17,7 +17,7 @@ YCB SynthForge is an end-to-end pipeline for detecting 85 types of YCB objects.
 
 ```bash
 # Build Docker images
-docker compose build
+docker compose build blenderproc yolo26_train
 
 # Download YOLO26 weights
 python scripts/download_weights.py
