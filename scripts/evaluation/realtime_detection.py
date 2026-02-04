@@ -7,6 +7,8 @@ USB Webカメラを使用したリアルタイム物体検出
 import argparse
 import cv2
 import time
+import numpy as np
+from collections import defaultdict, deque
 from pathlib import Path
 
 
@@ -68,14 +70,24 @@ def run_realtime_detection(
         print(f"Saving video to: {output_path}")
 
     print("\n" + "=" * 50)
-    print("Real-time YCB Object Detection")
+    print("Real-time YCB Object Detection (with Tracking)")
     print("=" * 50)
     print("Press 'q' to quit")
     print("Press 's' to save screenshot")
     print("Press 'c' to toggle confidence display")
+    print("Press 'p' to toggle coordinate display")
+    print("Press 't' to toggle trajectory display")
+    print("Press 'v' to toggle velocity display")
     print("=" * 50 + "\n")
 
     show_conf = True
+    show_coords = True
+    show_trajectory = True
+    show_velocity = True
+
+    # Track history for smoothing, trajectory, and velocity (1 second = ~30 frames)
+    history_length = int(fps)  # 1 second of history
+    track_history = defaultdict(lambda: deque(maxlen=history_length))
     frame_count = 0
     start_time = time.time()
     screenshot_count = 0
@@ -87,13 +99,15 @@ def run_realtime_detection(
                 print("Error: Cannot read frame")
                 break
 
-            # Run inference
-            results = model.predict(
+            # Run inference with tracking
+            results = model.track(
                 source=frame,
                 conf=conf,
                 iou=iou,
                 imgsz=imgsz,
                 device=device,
+                persist=True,
+                tracker="bytetrack.yaml",
                 verbose=False,
             )
 
@@ -103,6 +117,90 @@ def run_realtime_detection(
                 line_width=2,
                 font_size=0.6,
             )
+
+            # Process detections: smoothing, trajectory, velocity
+            if results[0].boxes is not None:
+                boxes = results[0].boxes
+                for box in boxes:
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+                    track_id = int(box.id[0].item()) if box.id is not None else -1
+
+                    if track_id == -1:
+                        continue
+
+                    # Calculate center point
+                    cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+
+                    # Store in history
+                    track_history[track_id].append((cx, cy, time.time()))
+
+                    # Get smoothed coordinates (moving average)
+                    history = track_history[track_id]
+                    if len(history) > 0:
+                        avg_cx = np.mean([p[0] for p in history])
+                        avg_cy = np.mean([p[1] for p in history])
+                    else:
+                        avg_cx, avg_cy = cx, cy
+
+                    # Draw trajectory (F)
+                    if show_trajectory and len(history) > 1:
+                        points = np.array([(int(p[0]), int(p[1])) for p in history], dtype=np.int32)
+                        cv2.polylines(
+                            annotated_frame,
+                            [points],
+                            isClosed=False,
+                            color=(0, 255, 255),  # Yellow
+                            thickness=2,
+                        )
+
+                    # Calculate velocity (E)
+                    velocity = 0.0
+                    if len(history) >= 2:
+                        # Use first and last points for velocity calculation
+                        p_old = history[0]
+                        p_new = history[-1]
+                        dt = p_new[2] - p_old[2]
+                        if dt > 0:
+                            dx = p_new[0] - p_old[0]
+                            dy = p_new[1] - p_old[1]
+                            distance = np.sqrt(dx**2 + dy**2)
+                            velocity = distance / dt  # pixels per second
+
+                    # Draw coordinate overlay (D - smoothed)
+                    if show_coords:
+                        coord_text = f"ID:{track_id} ({avg_cx:.0f},{avg_cy:.0f})"
+                        text_y = int(y2) + 20
+                        cv2.putText(
+                            annotated_frame,
+                            coord_text,
+                            (int(x1), text_y),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5,
+                            (255, 255, 0),  # Cyan
+                            1,
+                        )
+
+                    # Draw velocity (E)
+                    if show_velocity:
+                        vel_text = f"{velocity:.0f} px/s"
+                        text_y = int(y2) + 40 if show_coords else int(y2) + 20
+                        cv2.putText(
+                            annotated_frame,
+                            vel_text,
+                            (int(x1), text_y),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5,
+                            (0, 255, 0),  # Green
+                            1,
+                        )
+
+            # Clean up old tracks (not seen in current frame)
+            current_ids = set()
+            if results[0].boxes is not None and results[0].boxes.id is not None:
+                current_ids = set(int(id.item()) for id in results[0].boxes.id)
+            stale_ids = [tid for tid in track_history.keys() if tid not in current_ids]
+            for tid in stale_ids:
+                del track_history[tid]
 
             # Calculate FPS
             frame_count += 1
@@ -143,6 +241,15 @@ def run_realtime_detection(
             elif key == ord("c"):
                 show_conf = not show_conf
                 print(f"Confidence display: {'ON' if show_conf else 'OFF'}")
+            elif key == ord("p"):
+                show_coords = not show_coords
+                print(f"Coordinate display: {'ON' if show_coords else 'OFF'}")
+            elif key == ord("t"):
+                show_trajectory = not show_trajectory
+                print(f"Trajectory display: {'ON' if show_trajectory else 'OFF'}")
+            elif key == ord("v"):
+                show_velocity = not show_velocity
+                print(f"Velocity display: {'ON' if show_velocity else 'OFF'}")
 
     except KeyboardInterrupt:
         print("\nInterrupted by user")
